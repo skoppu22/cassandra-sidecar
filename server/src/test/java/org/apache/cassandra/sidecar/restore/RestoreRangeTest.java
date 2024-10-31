@@ -22,6 +22,7 @@ import java.math.BigInteger;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.Date;
 
 import org.junit.jupiter.api.Test;
 
@@ -95,6 +96,18 @@ public class RestoreRangeTest
                                               .build();
         RestoreRangeHandler handler = createRestoreRangeHandler(range);
         assertFailedHandler(range, handler, "Restore range is missing progress tracker or source slice");
+    }
+
+    @Test
+    void testCreateTaskFailsWhenJobExpires() throws Exception
+    {
+        long anchor = 1730334656231L;
+        RestoreJob expiredJob = RestoreJobTest.createNewTestingJob(UUIDs.timeBased()).unbuild().expireAt(new Date(anchor - 10000L)).build();
+        RestoreRange range = createTestRange(expiredJob, Paths.get("."), false);
+        RestoreRangeHandler handler = createRestoreRangeHandler(range);
+        assertFailedHandler(range, handler,
+                            "Restore job expired on 2024-10-31T00:30:46.231Z. " +
+                            "RestoreRange{sliceId='sliceId-123', sliceKey='myKey', sliceBucket='myBucket'}");
     }
 
     @Test
