@@ -66,7 +66,7 @@ public class CertificateCredentialsTest
     {
         Certificate certificate = mock(Certificate.class);
         CertificateCredentials credentials = new CertificateCredentials(certificate);
-        assertThatThrownBy(() -> credentials.toJson())
+        assertThatThrownBy(credentials::toJson)
         .isInstanceOf(UnsupportedOperationException.class);
     }
 
@@ -80,8 +80,9 @@ public class CertificateCredentialsTest
         try
         {
             X509Certificate certificate = CertificateBuilder.builder()
-                                                            .issuerName(issuerName)
-                                                            .buildSelfSigned();
+                                                            .subject(issuerName)
+                                                            .buildSelfSigned()
+                                                            .certificate();
             return new CertificateCredentials(Collections.singletonList(certificate));
         }
         catch (Exception e)

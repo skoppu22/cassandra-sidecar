@@ -18,9 +18,12 @@
 
 package io.vertx.ext.auth.mtls.impl;
 
+import java.util.List;
+
 import io.vertx.core.AsyncResult;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
+import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.auth.User;
 import io.vertx.ext.auth.authentication.AuthenticationProvider;
@@ -36,12 +39,15 @@ import io.vertx.ext.auth.mtls.MutualTlsAuthentication;
  */
 public class MutualTlsAuthenticationImpl implements MutualTlsAuthentication
 {
+    private final Vertx vertx;
     private final CertificateValidator certificateValidator;
     private final CertificateIdentityExtractor identityExtractor;
 
-    public MutualTlsAuthenticationImpl(CertificateValidator certificateValidator,
+    public MutualTlsAuthenticationImpl(Vertx vertx,
+                                       CertificateValidator certificateValidator,
                                        CertificateIdentityExtractor identityExtractor)
     {
+        this.vertx = vertx;
         this.certificateValidator = certificateValidator;
         this.identityExtractor = identityExtractor;
     }
@@ -55,16 +61,12 @@ public class MutualTlsAuthenticationImpl implements MutualTlsAuthentication
         }
 
         CertificateCredentials certificateCredentials = (CertificateCredentials) credentials;
-        try
-        {
+        return vertx.executeBlocking(() -> {
+            certificateCredentials.checkValid();
             certificateValidator.verifyCertificate(certificateCredentials);
-            String identity = identityExtractor.validIdentity(certificateCredentials);
-            return Future.succeededFuture(User.fromName(identity));
-        }
-        catch (Exception e)
-        {
-            return Future.failedFuture(e);
-        }
+            List<String> identities = identityExtractor.validIdentities(certificateCredentials);
+            return MutualTlsUser.fromIdentities(identities);
+        });
     }
 
     /**

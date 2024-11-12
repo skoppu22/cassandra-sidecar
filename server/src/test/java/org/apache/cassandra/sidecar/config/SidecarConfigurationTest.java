@@ -38,6 +38,7 @@ import static org.apache.cassandra.sidecar.config.yaml.MetricsFilteringConfigura
 import static org.apache.cassandra.sidecar.config.yaml.MetricsFilteringConfigurationImpl.REGEX_TYPE;
 import static org.apache.cassandra.sidecar.config.yaml.VertxMetricsConfigurationImpl.DEFAULT_JMX_DOMAIN_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatExceptionOfType;
 
 /**
@@ -288,6 +289,36 @@ class SidecarConfigurationTest
         assertThat(vertxFsOptions.fileCachingEnabled()).isTrue();
         assertThat(vertxFsOptions.fileCacheDir()).isEqualTo("/path/to/vertx/cache");
         assertThat(vertxFsOptions.classpathResolvingEnabled()).isTrue();
+    }
+
+    @Test
+    void testAccessControlConfiguration() throws Exception
+    {
+        Path yamlPath = yaml("config/sidecar_multiple_instances.yaml");
+        SidecarConfiguration config = SidecarConfigurationImpl.readYamlConfiguration(yamlPath);
+
+        AccessControlConfiguration accessControlConfiguration = config.accessControlConfiguration();
+        assertThat(accessControlConfiguration).isNotNull();
+        assertThat(accessControlConfiguration.enabled()).isTrue();
+
+        List<ParameterizedClassConfiguration> authenticators = accessControlConfiguration.authenticatorsConfiguration();
+        assertThat(authenticators).isNotNull().hasSize(1);
+        assertThat(authenticators.get(0).className()).isEqualTo("org.apache.cassandra.sidecar.acl.authentication.MutualTLSAuthenticationHandlerFactory");
+        assertThat(authenticators.get(0).namedParameters())
+        .contains(entry("certificate_validator", "io.vertx.ext.auth.mtls.impl.AllowAllCertificateValidator"),
+                  entry("certificate_identity_extractor", "org.apache.cassandra.sidecar.acl.authentication.CassandraIdentityExtractor"));
+
+        assertThat(accessControlConfiguration.adminIdentities().size()).isEqualTo(2);
+        assertThat(accessControlConfiguration.adminIdentities()).contains("spiffe://authorized/admin/identity1");
+        assertThat(accessControlConfiguration.adminIdentities()).contains("spiffe://authorized/admin/identity2");
+
+        assertThat(accessControlConfiguration.permissionCacheConfiguration()).isNotNull();
+        CacheConfiguration permissionCacheConfiguration = accessControlConfiguration.permissionCacheConfiguration();
+        assertThat(permissionCacheConfiguration.enabled()).isTrue();
+        assertThat(permissionCacheConfiguration.expireAfterAccessMillis()).isEqualTo(300000);
+        assertThat(permissionCacheConfiguration.maximumSize()).isEqualTo(1000);
+        assertThat(permissionCacheConfiguration.warmupRetries()).isEqualTo(5);
+        assertThat(permissionCacheConfiguration.warmupRetryIntervalMillis()).isEqualTo(2000);
     }
 
     void validateSingleInstanceSidecarConfiguration(SidecarConfiguration config)

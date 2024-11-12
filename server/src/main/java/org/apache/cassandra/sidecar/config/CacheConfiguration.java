@@ -41,4 +41,14 @@ public interface CacheConfiguration
     {
         return true;
     }
+
+    /**
+     * @return number of retries for cache warming
+     */
+    int warmupRetries();
+
+    /**
+     * @return interval duration in millis inbetween cache warming retries
+     */
+    long warmupRetryIntervalMillis();
 }

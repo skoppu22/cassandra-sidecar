@@ -40,6 +40,7 @@ import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.Checkpoint;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
+import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
 
 import static org.apache.cassandra.sidecar.common.ResourceUtils.writeResourceToPath;
 import static org.apache.cassandra.sidecar.utils.TestMetricUtils.registry;
@@ -47,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatException;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatNoException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link Server} lifecycle
@@ -249,6 +251,24 @@ class ServerTest
                       context.completeNow();
                   });
               });
+    }
+
+    @Test
+    @DisplayName("Invalid access control config, zero authenticators set")
+    void invalidAccessControlConfig()
+    {
+        assertThatThrownBy(() -> configureServer("config/sidecar_invalid_accesscontrol_config.yaml"))
+        .hasCauseInstanceOf(ConfigurationException.class)
+        .hasMessageContaining("Invalid access control configuration. There are no configured authenticators");
+    }
+
+    @Test
+    @DisplayName("Invalid access control config, unrecognized authentication handler set")
+    void unrecognizedAuthenticationHandlerSet()
+    {
+        assertThatThrownBy(() -> configureServer("config/sidecar_unrecognized_authenticator.yaml"))
+        .hasCauseInstanceOf(RuntimeException.class)
+        .hasMessageContaining("Implementation for class org.apache.cassandra.sidecar.acl.authentication.UnrecognizedAuthenticationHandler has not been registered");
     }
 
     Future<String> validateHealthEndpoint(String deploymentId)

@@ -44,10 +44,14 @@ import io.vertx.ext.dropwizard.Match;
 import io.vertx.ext.dropwizard.MatchType;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.ChainAuthHandler;
 import io.vertx.ext.web.handler.ErrorHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
 import io.vertx.ext.web.handler.StaticHandler;
 import io.vertx.ext.web.handler.TimeoutHandler;
+import org.apache.cassandra.sidecar.acl.authentication.AuthenticationHandlerFactory;
+import org.apache.cassandra.sidecar.acl.authentication.AuthenticationHandlerFactoryRegistry;
+import org.apache.cassandra.sidecar.acl.authentication.MutualTlsAuthenticationHandlerFactory;
 import org.apache.cassandra.sidecar.adapters.base.CassandraFactory;
 import org.apache.cassandra.sidecar.adapters.cassandra41.Cassandra41Factory;
 import org.apache.cassandra.sidecar.cluster.CQLSessionProviderImpl;
@@ -65,10 +69,12 @@ import org.apache.cassandra.sidecar.common.server.dns.DnsResolver;
 import org.apache.cassandra.sidecar.common.server.utils.DriverUtils;
 import org.apache.cassandra.sidecar.common.server.utils.SidecarVersionProvider;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
+import org.apache.cassandra.sidecar.config.AccessControlConfiguration;
 import org.apache.cassandra.sidecar.config.CassandraInputValidationConfiguration;
 import org.apache.cassandra.sidecar.config.FileSystemOptionsConfiguration;
 import org.apache.cassandra.sidecar.config.InstanceConfiguration;
 import org.apache.cassandra.sidecar.config.JmxConfiguration;
+import org.apache.cassandra.sidecar.config.ParameterizedClassConfiguration;
 import org.apache.cassandra.sidecar.config.ServiceConfiguration;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
 import org.apache.cassandra.sidecar.config.VertxConfiguration;
@@ -79,6 +85,8 @@ import org.apache.cassandra.sidecar.db.schema.RestoreRangesSchema;
 import org.apache.cassandra.sidecar.db.schema.RestoreSlicesSchema;
 import org.apache.cassandra.sidecar.db.schema.SidecarInternalKeyspace;
 import org.apache.cassandra.sidecar.db.schema.SidecarSchema;
+import org.apache.cassandra.sidecar.db.schema.SystemAuthSchema;
+import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
 import org.apache.cassandra.sidecar.logging.SidecarLoggerHandler;
 import org.apache.cassandra.sidecar.metrics.MetricRegistryFactory;
 import org.apache.cassandra.sidecar.metrics.SchemaMetrics;
@@ -184,7 +192,52 @@ public class MainModule extends AbstractModule
 
     @Provides
     @Singleton
+    public AuthenticationHandlerFactoryRegistry authNHandlerFactoryRegistry(MutualTlsAuthenticationHandlerFactory mTLSAuthHandlerFactory)
+    {
+        AuthenticationHandlerFactoryRegistry registry = new AuthenticationHandlerFactoryRegistry();
+        registry.register(mTLSAuthHandlerFactory);
+        return registry;
+    }
+
+    @Provides
+    @Singleton
+    public ChainAuthHandler chainAuthHandler(Vertx vertx,
+                                             SidecarConfiguration sidecarConfiguration,
+                                             AuthenticationHandlerFactoryRegistry registry) throws ConfigurationException
+    {
+        AccessControlConfiguration accessControlConfiguration = sidecarConfiguration.accessControlConfiguration();
+        List<ParameterizedClassConfiguration> authList = accessControlConfiguration.authenticatorsConfiguration();
+        if (!accessControlConfiguration.enabled())
+        {
+            return ChainAuthHandler.any();
+        }
+
+        if (authList == null || authList.isEmpty())
+        {
+            LOGGER.error("Access control was enabled, but there are no configured authenticators");
+            throw new ConfigurationException("Invalid access control configuration. There are no configured authenticators");
+        }
+
+        ChainAuthHandler chainAuthHandler = ChainAuthHandler.any();
+        for (ParameterizedClassConfiguration config : authList)
+        {
+            AuthenticationHandlerFactory factory = registry.getFactory(config.className());
+
+            if (factory == null)
+            {
+                throw new RuntimeException(String.format("Implementation for class %s has not been registered",
+                                                         config.className()));
+            }
+            chainAuthHandler.add(factory.create(vertx, accessControlConfiguration, config.namedParameters()));
+        }
+        return chainAuthHandler;
+    }
+
+    @Provides
+    @Singleton
     public Router vertxRouter(Vertx vertx,
+                              SidecarConfiguration sidecarConfiguration,
+                              ChainAuthHandler chainAuthHandler,
                               ServiceConfiguration conf,
                               CassandraHealthHandler cassandraHealthHandler,
                               StreamSSTableComponentHandler streamSSTableComponentHandler,
@@ -220,6 +273,12 @@ public class MainModule extends AbstractModule
               .handler(loggerHandler)
               .handler(TimeoutHandler.create(conf.requestTimeoutMillis(),
                                              HttpResponseStatus.REQUEST_TIMEOUT.code()));
+
+        // chain authentication before all requests
+        if (sidecarConfiguration.accessControlConfiguration().enabled())
+        {
+            router.route().order(RoutingOrder.HIGHEST.order).handler(chainAuthHandler);
+        }
 
         router.route()
               .path(ApiEndpointsV1.API + "/*")
@@ -543,6 +602,7 @@ public class MainModule extends AbstractModule
                                        RestoreJobsSchema restoreJobsSchema,
                                        RestoreSlicesSchema restoreSlicesSchema,
                                        RestoreRangesSchema restoreRangesSchema,
+                                       SystemAuthSchema systemAuthSchema,
                                        SidecarMetrics metrics)
     {
         SidecarInternalKeyspace sidecarInternalKeyspace = new SidecarInternalKeyspace(configuration);
@@ -550,6 +610,7 @@ public class MainModule extends AbstractModule
         sidecarInternalKeyspace.registerTableSchema(restoreJobsSchema);
         sidecarInternalKeyspace.registerTableSchema(restoreSlicesSchema);
         sidecarInternalKeyspace.registerTableSchema(restoreRangesSchema);
+        sidecarInternalKeyspace.registerTableSchema(systemAuthSchema);
         SchemaMetrics schemaMetrics = metrics.server().schema();
         return new SidecarSchema(vertx, executorPools, configuration,
                                  sidecarInternalKeyspace, cqlSessionProvider, schemaMetrics);
@@ -592,13 +653,13 @@ public class MainModule extends AbstractModule
      * Builds the {@link InstanceMetadata} from the {@link InstanceConfiguration},
      * a provided {@code  versionProvider}, and {@code healthCheckFrequencyMillis}.
      *
-     * @param vertx                 the vertx instance
-     * @param cassandraInstance     the cassandra instance configuration
-     * @param versionProvider       a Cassandra version provider
-     * @param sidecarVersion        the version of the Sidecar from the current binary
-     * @param jmxConfiguration      the configuration for the JMX Client
-     * @param session               the CQL Session provider
-     * @param registryFactory       factory for creating cassandra instance specific registry
+     * @param vertx             the vertx instance
+     * @param cassandraInstance the cassandra instance configuration
+     * @param versionProvider   a Cassandra version provider
+     * @param sidecarVersion    the version of the Sidecar from the current binary
+     * @param jmxConfiguration  the configuration for the JMX Client
+     * @param session           the CQL Session provider
+     * @param registryFactory   factory for creating cassandra instance specific registry
      * @return the build instance metadata object
      */
     private static InstanceMetadata buildInstanceMetadata(Vertx vertx,

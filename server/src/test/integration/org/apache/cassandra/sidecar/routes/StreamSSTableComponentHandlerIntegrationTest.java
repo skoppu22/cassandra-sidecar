@@ -49,7 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StreamSSTableComponentHandlerIntegrationTest extends IntegrationTestBase
 {
     @CassandraIntegrationTest(numDataDirsPerInstance = 4)
-    void testStreamIncludingIndexFiles(VertxTestContext context) throws InterruptedException
+    void testStreamIncludingIndexFiles(VertxTestContext context) throws Exception
     {
         createTestKeyspace();
         QualifiedTableName table = createTestTableAndPopulate();
@@ -59,7 +59,7 @@ class StreamSSTableComponentHandlerIntegrationTest extends IntegrationTestBase
                                                       "[a-z]{2}-[0-9]-big-Data.db",
                                                       "[a-z]{2}-[0-9]-big-TOC.txt");
 
-        WebClient client = WebClient.create(vertx);
+        WebClient client = mTLSClient();
         String testRoute = String.format("/api/v1/keyspaces/%s/tables/%s/snapshots/my-snapshot",
                                          table.keyspace(), table.tableName());
 

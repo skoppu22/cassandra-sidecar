@@ -18,8 +18,11 @@
 
 package org.apache.cassandra.sidecar.testing;
 
+import java.nio.file.Path;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.datastax.driver.core.Session;
 import com.google.inject.AbstractModule;
@@ -29,12 +32,20 @@ import io.vertx.core.Vertx;
 import org.apache.cassandra.sidecar.cluster.InstancesConfig;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.common.server.CQLSessionProvider;
+import org.apache.cassandra.sidecar.config.AccessControlConfiguration;
 import org.apache.cassandra.sidecar.config.HealthCheckConfiguration;
+import org.apache.cassandra.sidecar.config.ParameterizedClassConfiguration;
 import org.apache.cassandra.sidecar.config.ServiceConfiguration;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
+import org.apache.cassandra.sidecar.config.SslConfiguration;
+import org.apache.cassandra.sidecar.config.yaml.AccessControlConfigurationImpl;
+import org.apache.cassandra.sidecar.config.yaml.CacheConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.HealthCheckConfigurationImpl;
+import org.apache.cassandra.sidecar.config.yaml.KeyStoreConfigurationImpl;
+import org.apache.cassandra.sidecar.config.yaml.ParameterizedClassConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.SchemaKeyspaceConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.SidecarConfigurationImpl;
+import org.apache.cassandra.sidecar.config.yaml.SslConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.TestServiceConfiguration;
 import org.apache.cassandra.sidecar.exceptions.NoSuchSidecarInstanceException;
 import org.jetbrains.annotations.NotNull;
@@ -47,11 +58,24 @@ import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_SERVER_
  */
 public class IntegrationTestModule extends AbstractModule
 {
+    public static final String ADMIN_IDENTITY = "spiffe://cassandra/sidecar/admin";
     private CassandraSidecarTestContext cassandraTestContext;
+    private Path serverKeystorePath;
+    private Path truststorePath;
 
     public void setCassandraTestContext(CassandraSidecarTestContext cassandraTestContext)
     {
         this.cassandraTestContext = cassandraTestContext;
+    }
+
+    public void setServerKeystorePath(Path serverKeystorePath)
+    {
+        this.serverKeystorePath = serverKeystorePath;
+    }
+
+    public void setTruststorePath(Path truststorePath)
+    {
+        this.truststorePath = truststorePath;
     }
 
     @Provides
@@ -73,7 +97,22 @@ public class IntegrationTestModule extends AbstractModule
                                   .build();
         HealthCheckConfiguration healthCheckConfiguration
         = new HealthCheckConfigurationImpl(50, 500);
+
+        SslConfiguration sslConfiguration =
+        SslConfigurationImpl.builder()
+                            .enabled(true)
+                            .useOpenSsl(true)
+                            .handshakeTimeoutInSeconds(10L)
+                            .clientAuth("REQUEST")
+                            .keystore(new KeyStoreConfigurationImpl(serverKeystorePath.toAbsolutePath().toString(),
+                                                                    "password"))
+                            .truststore(new KeyStoreConfigurationImpl(truststorePath.toAbsolutePath().toString(),
+                                                                      "password"))
+                            .build();
+        AccessControlConfiguration accessControlConfiguration = accessControlConfiguration();
         return SidecarConfigurationImpl.builder()
+                                       .sslConfiguration(sslConfiguration)
+                                       .accessControlConfiguration(accessControlConfiguration)
                                        .serviceConfiguration(conf)
                                        .healthCheckConfiguration(healthCheckConfiguration)
                                        .build();
@@ -105,6 +144,22 @@ public class IntegrationTestModule extends AbstractModule
         };
         vertx.eventBus().localConsumer(ON_SERVER_STOP.address(), message -> cqlSessionProvider.close());
         return cqlSessionProvider;
+    }
+
+    private AccessControlConfiguration accessControlConfiguration()
+    {
+        Map<String, String> params = new HashMap<String, String>()
+        { {
+            put("certificate_validator", "io.vertx.ext.auth.mtls.impl.CertificateValidatorImpl");
+            put("certificate_identity_extractor", "org.apache.cassandra.sidecar.acl.authentication.CassandraIdentityExtractor");
+        } };
+        ParameterizedClassConfiguration mTLSConfig
+        = new ParameterizedClassConfigurationImpl("org.apache.cassandra.sidecar.acl.authentication.MutualTlsAuthenticationHandlerFactory",
+                                                  params);
+        return new AccessControlConfigurationImpl(true,
+                                                  Collections.singletonList(mTLSConfig),
+                                                  Collections.singleton(ADMIN_IDENTITY),
+                                                  new CacheConfigurationImpl());
     }
 
     class WrapperInstancesConfig implements InstancesConfig
