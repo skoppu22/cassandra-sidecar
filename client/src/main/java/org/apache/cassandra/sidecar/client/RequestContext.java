@@ -33,6 +33,7 @@ import org.apache.cassandra.sidecar.common.request.CleanSSTableUploadSessionRequ
 import org.apache.cassandra.sidecar.common.request.ClearSnapshotRequest;
 import org.apache.cassandra.sidecar.common.request.ConnectedClientStatsRequest;
 import org.apache.cassandra.sidecar.common.request.CreateSnapshotRequest;
+import org.apache.cassandra.sidecar.common.request.GetPreemptiveOpenIntervalRequest;
 import org.apache.cassandra.sidecar.common.request.GossipInfoRequest;
 import org.apache.cassandra.sidecar.common.request.ImportSSTableRequest;
 import org.apache.cassandra.sidecar.common.request.ListSnapshotFilesRequest;
@@ -484,6 +485,16 @@ public class RequestContext
         public Builder connectedClientStatsRequest()
         {
             return request(new ConnectedClientStatsRequest());
+        }
+
+        /**
+         * Sets the {@code request} to be a {@link GetPreemptiveOpenIntervalRequest} and returns a reference to this builder
+         * enabling method chaining
+         * @return a reference to this builder
+         */
+        public Builder getPreemptiveOpenIntervalRequest()
+        {
+            return request(new GetPreemptiveOpenIntervalRequest());
         }
 
         /**

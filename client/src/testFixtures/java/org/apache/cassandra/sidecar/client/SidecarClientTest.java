@@ -67,6 +67,7 @@ import org.apache.cassandra.sidecar.common.request.data.CreateRestoreJobRequestP
 import org.apache.cassandra.sidecar.common.request.data.MD5Digest;
 import org.apache.cassandra.sidecar.common.request.data.XXHash32Digest;
 import org.apache.cassandra.sidecar.common.response.ConnectedClientStatsResponse;
+import org.apache.cassandra.sidecar.common.response.GetPreemptiveOpenIntervalResponse;
 import org.apache.cassandra.sidecar.common.response.GossipInfoResponse;
 import org.apache.cassandra.sidecar.common.response.HealthResponse;
 import org.apache.cassandra.sidecar.common.response.ListSnapshotFilesResponse;
@@ -1438,6 +1439,19 @@ abstract class SidecarClientTest
         assertThat(entry.authenticationMetadata()).containsKey("identity");
         assertThat(entry.clientOptions()).containsKeys("CQL_VERSION", "DRIVER_NAME", "DRIVER_VERSION");
         validateResponseServed(ApiEndpointsV1.CONNECTED_CLIENT_STATS_ROUTE);
+    }
+
+    @Test
+    public void testGetPreemptiveOpenInterval() throws Exception
+    {
+        String responseAsString = "{\"SSTablePreemptiveOpenIntervalInMB\":30}";
+
+        MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(responseAsString);
+        enqueue(response);
+        GetPreemptiveOpenIntervalResponse result = client.getPreemptiveOpenInterval().get();
+
+        assertThat(result).isNotNull();
+        assertThat(result.sstablePreemptiveOpenIntervalInMB()).isNotNull().isEqualTo(30);
     }
 
     private void enqueue(MockResponse response)

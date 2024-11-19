@@ -53,4 +53,9 @@ public interface ServerMetrics
      * @return metrics related to internal caches that are tracked.
      */
     CacheMetrics cacheMetrics();
+
+    /**
+     * @return metrics related to invocation of C* JMX operations
+     */
+    JmxOperationsMetrics jmxOperationsMetrics();
 }

@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.sidecar.common.response.GetPreemptiveOpenIntervalResponse;
 import org.apache.cassandra.sidecar.common.response.RingResponse;
 import org.apache.cassandra.sidecar.common.response.TokenRangeReplicasResponse;
 import org.apache.cassandra.sidecar.common.server.JmxClient;
@@ -212,5 +213,12 @@ public class CassandraStorageOperations implements StorageOperations
         requireNonNull(table, "table must be non-null");
         jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME)
                  .forceKeyspaceCleanup(concurrency, keyspace, table);
+    }
+
+    @Override
+    public GetPreemptiveOpenIntervalResponse getSSTablePreemptiveOpenIntervalInMB()
+    {
+        int preemptiveOpenInterval = jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME).getSSTablePreemptiveOpenIntervalInMB();
+        return new GetPreemptiveOpenIntervalResponse(preemptiveOpenInterval);
     }
 }

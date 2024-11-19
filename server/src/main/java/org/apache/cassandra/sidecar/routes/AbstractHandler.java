@@ -26,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpStatusClass;
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
@@ -35,11 +36,13 @@ import org.apache.cassandra.sidecar.adapters.base.exception.OperationUnavailable
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.common.server.MetricsOperations;
+import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.common.server.data.Name;
 import org.apache.cassandra.sidecar.common.server.data.QualifiedTableName;
 import org.apache.cassandra.sidecar.common.server.exceptions.JmxAuthenticationException;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.exceptions.NoSuchSidecarInstanceException;
+import org.apache.cassandra.sidecar.metrics.JmxOperationsMetrics;
 import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 
@@ -330,5 +333,35 @@ public abstract class AbstractHandler<T> implements Handler<RoutingContext>
             return host.startsWith("[") ? host.substring(1, host.length() - 1) : host;
         }
         return address;
+    }
+
+    protected StorageOperations getStorageOperations(String host)
+    {
+        CassandraAdapterDelegate delegate = this.metadataFetcher.delegate(host);
+        StorageOperations storageOperations = delegate == null ? null : delegate.storageOperations();
+        if (storageOperations == null)
+        {
+            throw cassandraServiceUnavailable();
+        }
+
+
+        return storageOperations;
+    }
+
+    protected <V> void updateJmxMetric(AsyncResult<V> result,
+                                       JmxOperationsMetrics jmxOperationsMetrics,
+                                       String operationName,
+                                       long startTime)
+    {
+        if (result.succeeded())
+        {
+            jmxOperationsMetrics.recordTimeTaken(operationName + "Succeeded",
+                                                 System.nanoTime() - startTime);
+        }
+        else
+        {
+            jmxOperationsMetrics.recordTimeTaken(operationName + "Failed",
+                                                 System.nanoTime() - startTime);
+        }
     }
 }

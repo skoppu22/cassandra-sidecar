@@ -22,8 +22,11 @@ import java.lang.reflect.AnnotatedElement;
 import java.net.BindException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.StringTokenizer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -172,7 +175,8 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
                                   .withDCs(dcCount)
                                   .withSharedClasses(extra.or(AbstractCluster.SHARED_PREDICATE))
                                   .withDataDirCount(annotation.numDataDirsPerInstance())
-                                  .withConfig(config -> annotationToFeatureList(annotation).forEach(config::with));
+                                  .withConfig(config -> annotationToFeatureList(annotation).forEach(config::with))
+                                  .appendConfig(config -> customYamlProps(annotation).forEach(config::set));
                 TokenSupplier tokenSupplier = TokenSupplier.evenlyDistributedTokens(finalNodeCount,
                                                                                     clusterBuilder.getTokenCount());
                 clusterBuilder.withTokenSupplier(tokenSupplier);
@@ -243,6 +247,21 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
                 configuredFeatures.add(Feature.NETWORK);
             }
             return configuredFeatures;
+        }
+
+        private Map<String, String> customYamlProps(CassandraIntegrationTest annotation)
+        {
+            String yamlProps = annotation.yamlProps();
+            Map<String, String> parsedYamlProps = new HashMap<>();
+
+            StringTokenizer tokenizer = new StringTokenizer(yamlProps, ",");
+            while (tokenizer.hasMoreTokens())
+            {
+                String[] entry = tokenizer.nextToken().split("=");
+                parsedYamlProps.put(entry[0], entry[1]);
+            }
+
+            return parsedYamlProps;
         }
 
         /**

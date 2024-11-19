@@ -159,4 +159,10 @@ public class GossipDependentStorageJmxOperations implements StorageJmxOperations
         LOGGER.warn("Gossip is disabled and unavailable for the operation");
         throw OperationUnavailableException.GOSSIP_DISABLED;
     }
+
+    @Override
+    public int getSSTablePreemptiveOpenIntervalInMB()
+    {
+        return delegate.getSSTablePreemptiveOpenIntervalInMB();
+    }
 }
