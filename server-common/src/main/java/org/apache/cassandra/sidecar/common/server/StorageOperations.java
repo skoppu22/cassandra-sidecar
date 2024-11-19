@@ -102,4 +102,9 @@ public interface StorageOperations
     {
         outOfRangeDataCleanup(keyspace, table, 1);
     }
+
+    /**
+     * @return sstable's preemptiveOpenInterval value in MB
+     */
+    int getSSTablePreemptiveOpenIntervalInMB();
 }

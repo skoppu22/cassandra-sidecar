@@ -111,6 +111,13 @@ public final class ApiEndpointsV1
 
     public static final String CONNECTED_CLIENT_STATS_ROUTE = API_V1 + CASSANDRA + "/stats/connected-clients";
 
+    // Endpoint to retrieve sstable's preemptiveOpenInterval value.
+    // Value returned is in MB, may return negative value when disabled
+    private static final String MANAGEMENT = "/management";
+    private static final String MANAGEMENT_ROUTES_PREFIX = API_V1 + CASSANDRA + MANAGEMENT;
+    private static final String SSTABLE = "/sstable";
+    public static final String SSTABLE_PREEMPTIVE_OPEN_INTERVAL = MANAGEMENT_ROUTES_PREFIX + SSTABLE +
+                                                                  "/preemptive-open-interval";
     private ApiEndpointsV1()
     {
         throw new IllegalStateException(getClass() + " is a constants container and shall not be instantiated");

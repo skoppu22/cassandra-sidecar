@@ -33,6 +33,7 @@ public class ServerMetricsImpl implements ServerMetrics
     protected final RestoreMetrics restoreMetrics;
     protected final SchemaMetrics schemaMetrics;
     protected final CacheMetrics cacheMetrics;
+    protected final JmxOperationsMetrics jmxOperationsMetrics;
 
     public ServerMetricsImpl(MetricRegistry metricRegistry)
     {
@@ -43,6 +44,7 @@ public class ServerMetricsImpl implements ServerMetrics
         this.restoreMetrics = new RestoreMetrics(metricRegistry);
         this.schemaMetrics = new SchemaMetrics(metricRegistry);
         this.cacheMetrics = new CacheMetrics(metricRegistry);
+        this.jmxOperationsMetrics = new JmxOperationsMetrics(metricRegistry);
     }
 
     @Override
@@ -73,5 +75,11 @@ public class ServerMetricsImpl implements ServerMetrics
     public CacheMetrics cacheMetrics()
     {
         return cacheMetrics;
+    }
+
+    @Override
+    public JmxOperationsMetrics jmxOperationsMetrics()
+    {
+        return jmxOperationsMetrics;
     }
 }

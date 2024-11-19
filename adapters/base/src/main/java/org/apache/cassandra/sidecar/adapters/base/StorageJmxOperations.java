@@ -159,4 +159,10 @@ public interface StorageJmxOperations
      * @throws InterruptedException it does not really throw but declared in MBean
      */
     int forceKeyspaceCleanup(int jobs, String keyspaceName, String... tables) throws IOException, ExecutionException, InterruptedException;
+
+    /**
+     * Invokes C* StorageServiceMBean's JMX function getSSTablePreemptiveOpenIntervalInMB
+     * @return the same value returned by the JMX operation
+     */
+    int getSSTablePreemptiveOpenIntervalInMB();
 }

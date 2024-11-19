@@ -213,4 +213,10 @@ public class CassandraStorageOperations implements StorageOperations
         jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME)
                  .forceKeyspaceCleanup(concurrency, keyspace, table);
     }
+
+    @Override
+    public int getSSTablePreemptiveOpenIntervalInMB()
+    {
+        return jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME).getSSTablePreemptiveOpenIntervalInMB();
+    }
 }
