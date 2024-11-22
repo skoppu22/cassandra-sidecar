@@ -38,12 +38,6 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
     @JsonProperty("port")
     protected final int port;
 
-    @JsonProperty("username")
-    protected final String username;
-
-    @JsonProperty("password")
-    protected final String password;
-
     @JsonProperty("data_dirs")
     protected final List<String> dataDirs;
 
@@ -70,8 +64,6 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
         this.id = 0;
         this.host = null;
         this.port = 9042;
-        this.username = null;
-        this.password = null;
         this.dataDirs = null;
         this.stagingDir = null;
         this.jmxHost = null;
@@ -82,23 +74,19 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
     }
 
     public InstanceConfigurationImpl(int id,
-                                        String host,
-                                        int port,
-                                        String username,
-                                        String password,
-                                        List<String> dataDirs,
-                                        String stagingDir,
-                                        String jmxHost,
-                                        int jmxPort,
-                                        boolean jmxSslEnabled,
-                                        String jmxRole,
-                                        String jmxRolePassword)
+                                     String host,
+                                     int port,
+                                     List<String> dataDirs,
+                                     String stagingDir,
+                                     String jmxHost,
+                                     int jmxPort,
+                                     boolean jmxSslEnabled,
+                                     String jmxRole,
+                                     String jmxRolePassword)
     {
         this.id = id;
         this.host = host;
         this.port = port;
-        this.username = username;
-        this.password = password;
         this.dataDirs = Collections.unmodifiableList(dataDirs);
         this.stagingDir = stagingDir;
         this.jmxHost = jmxHost;
@@ -136,26 +124,6 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
     public int port()
     {
         return port;
-    }
-
-    /**
-     * @return the username used for connecting to the Cassandra instance
-     */
-    @Override
-    @JsonProperty("username")
-    public String username()
-    {
-        return username;
-    }
-
-    /**
-     * @return the password used for connecting to the Cassandra instance
-     */
-    @Override
-    @JsonProperty("password")
-    public String password()
-    {
-        return password;
     }
 
     /**

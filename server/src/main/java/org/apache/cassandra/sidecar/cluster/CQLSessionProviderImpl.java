@@ -18,30 +18,47 @@
 
 package org.apache.cassandra.sidecar.cluster;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.NettyOptions;
+import com.datastax.driver.core.PlainTextAuthProvider;
 import com.datastax.driver.core.QueryOptions;
+import com.datastax.driver.core.RemoteEndpointAwareNettySSLOptions;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.exceptions.DriverInternalError;
 import com.datastax.driver.core.policies.ExponentialReconnectionPolicy;
 import com.datastax.driver.core.policies.LoadBalancingPolicy;
 import com.datastax.driver.core.policies.ReconnectionPolicy;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
 import org.apache.cassandra.sidecar.cluster.driver.SidecarLoadBalancingPolicy;
 import org.apache.cassandra.sidecar.common.server.CQLSessionProvider;
 import org.apache.cassandra.sidecar.common.server.utils.DriverUtils;
 import org.apache.cassandra.sidecar.config.DriverConfiguration;
+import org.apache.cassandra.sidecar.config.KeyStoreConfiguration;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
+import org.apache.cassandra.sidecar.config.SslConfiguration;
+import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
 
@@ -55,9 +72,12 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
     private final List<InetSocketAddress> contactPoints;
     private final int numConnections;
     private final String localDc;
+    private final SslConfiguration sslConfiguration;
     private final NettyOptions nettyOptions;
     private final ReconnectionPolicy reconnectionPolicy;
     private final List<InetSocketAddress> localInstances;
+    private final String username;
+    private final String password;
     private final DriverUtils driverUtils;
     @Nullable
     private volatile Session session;
@@ -68,12 +88,18 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
                                   int healthCheckFrequencyMillis,
                                   String localDc,
                                   int numConnections,
+                                  String username,
+                                  String password,
+                                  SslConfiguration sslConfiguration,
                                   NettyOptions options)
     {
         this.contactPoints = contactPoints;
         this.localInstances = localInstances;
         this.localDc = localDc;
         this.numConnections = numConnections;
+        this.username = username;
+        this.password = password;
+        this.sslConfiguration = sslConfiguration;
         this.nettyOptions = options;
         this.reconnectionPolicy = new ExponentialReconnectionPolicy(500, healthCheckFrequencyMillis);
         this.driverUtils = new DriverUtils();
@@ -91,6 +117,9 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
                                            .map(i -> new InetSocketAddress(i.host(), i.port()))
                                            .collect(Collectors.toList());
         this.localDc = driverConfiguration.localDc();
+        this.username = driverConfiguration.username();
+        this.password = driverConfiguration.password();
+        this.sslConfiguration = driverConfiguration.sslConfiguration();
         this.numConnections = driverConfiguration.numConnections();
         this.nettyOptions = options;
         int maxDelayMs = configuration.healthCheckConfiguration().checkIntervalMillis();
@@ -137,16 +166,38 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
                                                                      driverUtils);
             // Prevent spurious reconnects of ignored down nodes on `onUp` events
             QueryOptions queryOptions = new QueryOptions().setReprepareOnUp(false);
-            cluster = Cluster.builder()
-                             .addContactPointsWithPorts(contactPoints)
-                             .withReconnectionPolicy(reconnectionPolicy)
-                             .withoutMetrics()
-                             .withLoadBalancingPolicy(lbp)
-                             .withQueryOptions(queryOptions)
-                             // tests can create a lot of these Cluster objects, to avoid creating HWTs and
-                             // event thread pools for each we have the override
-                             .withNettyOptions(nettyOptions)
-                             .build();
+            Cluster.Builder builder
+            = Cluster.builder()
+                     .addContactPointsWithPorts(contactPoints)
+                     .withReconnectionPolicy(reconnectionPolicy)
+                     .withoutMetrics()
+                     .withLoadBalancingPolicy(lbp)
+                     .withQueryOptions(queryOptions)
+                     // tests can create a lot of these Cluster objects, to avoid creating HWTs and
+                     // event thread pools for each we have the override
+                     .withNettyOptions(nettyOptions);
+
+            SslContext sslContext = createSslContext(sslConfiguration);
+            if (sslContext != null)
+            {
+                RemoteEndpointAwareNettySSLOptions sslOptions
+                = new RemoteEndpointAwareNettySSLOptions(sslContext);
+                builder.withSSL(sslOptions);
+            }
+
+            if (username != null && password != null)
+            {
+                builder.withCredentials(username, password);
+            }
+            // During mTLS connections, when client sends in keystore, we should have an AuthProvider passed along.
+            // hence we pass empty username and password in PlainTextAuthProvider here, in case user hasn't already
+            // configured username and password.
+            else if (sslConfiguration.isKeystoreConfigured())
+            {
+                builder.withAuthProvider(new PlainTextAuthProvider("", ""));
+            }
+
+            cluster = builder.build();
             session = cluster.connect();
             logger.info("Successfully connected to Cassandra!");
         }
@@ -202,5 +253,59 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
                 throw propagateCause(e);
             }
         }
+    }
+
+    /**
+     * We configure the SslContext in the driver when establishing an SSL or mTLS connection with Cassandra. For an
+     * SSL connection, the driver only needs to provide the truststore, while Cassandra supplies its keystore for
+     * validation. In the case of an mTLS connection, both the keystore and truststore are configured on the driver side.
+     */
+    private SslContext createSslContext(SslConfiguration sslConfiguration)
+    {
+        if (sslConfiguration == null || !sslConfiguration.enabled())
+        {
+            return null;
+        }
+
+        SslContextBuilder sslContextBuilder;
+        try
+        {
+            sslContextBuilder = SslContextBuilder.forClient()
+                                                 .protocols(sslConfiguration.secureTransportProtocols());
+
+            if (sslConfiguration.isKeystoreConfigured())
+            {
+                KeyStore keyStore = createKeystore(sslConfiguration.keystore());
+                KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                kmf.init(keyStore, sslConfiguration.keystore().password().toCharArray());
+                sslContextBuilder.keyManager(kmf);
+            }
+
+            // We set the truststore only if it is configured. For an SSL connection, if the truststore is required
+            // but the user has not provided one, the default Java truststore is used.
+            if (sslConfiguration.isTrustStoreConfigured())
+            {
+                KeyStore truststore = createKeystore(sslConfiguration.truststore());
+                TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+                tmf.init(truststore);
+                sslContextBuilder.trustManager(tmf);
+            }
+            return sslContextBuilder.build();
+        }
+        catch (Exception e)
+        {
+            throw new ConfigurationException("Error creating SsLContext for Cassandra connections", e);
+        }
+    }
+
+    private KeyStore createKeystore(KeyStoreConfiguration config)
+    throws KeyStoreException, IOException, CertificateException, NoSuchAlgorithmException
+    {
+        KeyStore keystore = KeyStore.getInstance(config.type());
+        try (InputStream inputStream = Files.newInputStream(Paths.get(config.path())))
+        {
+            keystore.load(inputStream, config.password().toCharArray());
+        }
+        return keystore;
     }
 }
