@@ -22,7 +22,9 @@ import java.lang.reflect.AnnotatedElement;
 import java.net.BindException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -145,6 +147,14 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
             return Arrays.asList(parameterResolver(), afterEach(), beforeEach());
         }
 
+        Map<String, String> getDefaultProps()
+        {
+            Map<String, String> props = new HashMap<>();
+            props.put("sstable_preemptive_open_interval", "50MiB");
+
+            return props;
+        }
+
         private BeforeEachCallback beforeEach()
         {
             Predicate<String> extra = c -> {
@@ -172,7 +182,8 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
                                   .withDCs(dcCount)
                                   .withSharedClasses(extra.or(AbstractCluster.SHARED_PREDICATE))
                                   .withDataDirCount(annotation.numDataDirsPerInstance())
-                                  .withConfig(config -> annotationToFeatureList(annotation).forEach(config::with));
+                                  .withConfig(config -> annotationToFeatureList(annotation).forEach(config::with))
+                                  .appendConfig(config -> getDefaultProps().forEach(config::set));
                 TokenSupplier tokenSupplier = TokenSupplier.evenlyDistributedTokens(finalNodeCount,
                                                                                     clusterBuilder.getTokenCount());
                 clusterBuilder.withTokenSupplier(tokenSupplier);

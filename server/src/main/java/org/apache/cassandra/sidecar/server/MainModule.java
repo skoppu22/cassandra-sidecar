@@ -106,7 +106,7 @@ import org.apache.cassandra.sidecar.routes.StreamSSTableComponentHandler;
 import org.apache.cassandra.sidecar.routes.TimeSkewHandler;
 import org.apache.cassandra.sidecar.routes.TokenRangeReplicaMapHandler;
 import org.apache.cassandra.sidecar.routes.cassandra.NodeSettingsHandler;
-import org.apache.cassandra.sidecar.routes.cassandra.management.GetPreemptiveOpenIntervalHandler;
+import org.apache.cassandra.sidecar.routes.cassandra.GetPreemptiveOpenIntervalHandler;
 import org.apache.cassandra.sidecar.routes.restore.AbortRestoreJobHandler;
 import org.apache.cassandra.sidecar.routes.restore.CreateRestoreJobHandler;
 import org.apache.cassandra.sidecar.routes.restore.CreateRestoreSliceHandler;

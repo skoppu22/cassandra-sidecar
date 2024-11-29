@@ -1,4 +1,4 @@
-package org.apache.cassandra.sidecar.routes.management;
+package org.apache.cassandra.sidecar.routes.cassandra;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;

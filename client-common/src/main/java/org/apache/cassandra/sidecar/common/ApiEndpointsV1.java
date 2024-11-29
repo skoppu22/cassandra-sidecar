@@ -113,10 +113,8 @@ public final class ApiEndpointsV1
 
     // Endpoint to retrieve sstable's preemptiveOpenInterval value.
     // Value returned is in MB, may return negative value when disabled
-    private static final String MANAGEMENT = "/management";
-    private static final String MANAGEMENT_ROUTES_PREFIX = API_V1 + CASSANDRA + MANAGEMENT;
     private static final String SSTABLE = "/sstable";
-    public static final String SSTABLE_PREEMPTIVE_OPEN_INTERVAL = MANAGEMENT_ROUTES_PREFIX + SSTABLE +
+    public static final String SSTABLE_PREEMPTIVE_OPEN_INTERVAL = API_V1 + CASSANDRA + SSTABLE +
                                                                   "/preemptive-open-interval";
     private ApiEndpointsV1()
     {
