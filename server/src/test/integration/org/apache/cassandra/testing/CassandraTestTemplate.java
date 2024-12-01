@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.StringTokenizer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -147,14 +148,6 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
             return Arrays.asList(parameterResolver(), afterEach(), beforeEach());
         }
 
-        Map<String, String> getDefaultProps()
-        {
-            Map<String, String> props = new HashMap<>();
-            props.put("sstable_preemptive_open_interval", "50MiB");
-
-            return props;
-        }
-
         private BeforeEachCallback beforeEach()
         {
             Predicate<String> extra = c -> {
@@ -183,7 +176,7 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
                                   .withSharedClasses(extra.or(AbstractCluster.SHARED_PREDICATE))
                                   .withDataDirCount(annotation.numDataDirsPerInstance())
                                   .withConfig(config -> annotationToFeatureList(annotation).forEach(config::with))
-                                  .appendConfig(config -> getDefaultProps().forEach(config::set));
+                                  .appendConfig(config -> customYamlProps(annotation).forEach(config::set));
                 TokenSupplier tokenSupplier = TokenSupplier.evenlyDistributedTokens(finalNodeCount,
                                                                                     clusterBuilder.getTokenCount());
                 clusterBuilder.withTokenSupplier(tokenSupplier);
@@ -254,6 +247,21 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
                 configuredFeatures.add(Feature.NETWORK);
             }
             return configuredFeatures;
+        }
+
+        private Map<String, String> customYamlProps(CassandraIntegrationTest annotation)
+        {
+            String yamlProps = annotation.yamlProps();
+            Map<String, String> parsedYamlProps = new HashMap<>();
+
+            StringTokenizer tokenizer = new StringTokenizer(yamlProps, ",");
+            while (tokenizer.hasMoreTokens())
+            {
+                String[] entry = tokenizer.nextToken().split("=");
+                parsedYamlProps.put(entry[0], entry[1]);
+            }
+
+            return parsedYamlProps;
         }
 
         /**

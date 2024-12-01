@@ -67,6 +67,8 @@ public @interface CassandraIntegrationTest
      */
     int numDataDirsPerInstance() default 1;
 
+    String yamlProps() default "";
+
     /**
      * Returns whether gossip is enabled or disabled for the integration test. Defaults to {@code true}.
      *

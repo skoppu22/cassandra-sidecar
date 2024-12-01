@@ -105,8 +105,8 @@ import org.apache.cassandra.sidecar.routes.SchemaHandler;
 import org.apache.cassandra.sidecar.routes.StreamSSTableComponentHandler;
 import org.apache.cassandra.sidecar.routes.TimeSkewHandler;
 import org.apache.cassandra.sidecar.routes.TokenRangeReplicaMapHandler;
-import org.apache.cassandra.sidecar.routes.cassandra.NodeSettingsHandler;
 import org.apache.cassandra.sidecar.routes.cassandra.GetPreemptiveOpenIntervalHandler;
+import org.apache.cassandra.sidecar.routes.cassandra.NodeSettingsHandler;
 import org.apache.cassandra.sidecar.routes.restore.AbortRestoreJobHandler;
 import org.apache.cassandra.sidecar.routes.restore.CreateRestoreJobHandler;
 import org.apache.cassandra.sidecar.routes.restore.CreateRestoreSliceHandler;
@@ -419,7 +419,7 @@ public class MainModule extends AbstractModule
               .handler(validateRestoreJobRequest)
               .handler(restoreJobProgressHandler);
 
-        router.get(ApiEndpointsV1.SSTABLE_PREEMPTIVE_OPEN_INTERVAL)
+        router.get(ApiEndpointsV1.SSTABLE_PREEMPTIVE_OPEN_INTERVAL_ROUTE)
               .handler(getPreemptiveOpenIntervalHandler);
 
         return router;

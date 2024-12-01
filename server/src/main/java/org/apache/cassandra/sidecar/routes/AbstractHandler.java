@@ -344,6 +344,7 @@ public abstract class AbstractHandler<T> implements Handler<RoutingContext>
             throw cassandraServiceUnavailable();
         }
 
+
         return storageOperations;
     }
 

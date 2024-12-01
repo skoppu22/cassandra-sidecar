@@ -114,8 +114,8 @@ public final class ApiEndpointsV1
     // Endpoint to retrieve sstable's preemptiveOpenInterval value.
     // Value returned is in MB, may return negative value when disabled
     private static final String SSTABLE = "/sstable";
-    public static final String SSTABLE_PREEMPTIVE_OPEN_INTERVAL = API_V1 + CASSANDRA + SSTABLE +
-                                                                  "/preemptive-open-interval";
+    public static final String SSTABLE_PREEMPTIVE_OPEN_INTERVAL_ROUTE = API_V1 + CASSANDRA + SSTABLE +
+                                                                        "/preemptive-open-interval";
     private ApiEndpointsV1()
     {
         throw new IllegalStateException(getClass() + " is a constants container and shall not be instantiated");

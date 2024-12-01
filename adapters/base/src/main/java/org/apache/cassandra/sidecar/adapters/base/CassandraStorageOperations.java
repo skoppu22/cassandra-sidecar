@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.sidecar.common.response.GetPreemptiveOpenIntervalResponse;
 import org.apache.cassandra.sidecar.common.response.RingResponse;
 import org.apache.cassandra.sidecar.common.response.TokenRangeReplicasResponse;
 import org.apache.cassandra.sidecar.common.server.JmxClient;
@@ -215,8 +216,9 @@ public class CassandraStorageOperations implements StorageOperations
     }
 
     @Override
-    public int getSSTablePreemptiveOpenIntervalInMB()
+    public GetPreemptiveOpenIntervalResponse getSSTablePreemptiveOpenIntervalInMB()
     {
-        return jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME).getSSTablePreemptiveOpenIntervalInMB();
+        int preemptiveOpenInterval = jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME).getSSTablePreemptiveOpenIntervalInMB();
+        return new GetPreemptiveOpenIntervalResponse(preemptiveOpenInterval);
     }
 }

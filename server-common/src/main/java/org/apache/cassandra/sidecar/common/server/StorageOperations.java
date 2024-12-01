@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.cassandra.sidecar.common.response.GetPreemptiveOpenIntervalResponse;
 import org.apache.cassandra.sidecar.common.response.RingResponse;
 import org.apache.cassandra.sidecar.common.response.TokenRangeReplicasResponse;
 import org.apache.cassandra.sidecar.common.server.data.Name;
@@ -104,7 +105,7 @@ public interface StorageOperations
     }
 
     /**
-     * @return sstable's preemptiveOpenInterval value in MB
+     * @return sstable's preemptive open interval value
      */
-    int getSSTablePreemptiveOpenIntervalInMB();
+    GetPreemptiveOpenIntervalResponse getSSTablePreemptiveOpenIntervalInMB();
 }
