@@ -348,6 +348,24 @@ public abstract class AbstractHandler<T> implements Handler<RoutingContext>
         return storageOperations;
     }
 
+    /**
+     * Retrieve requested path param as an integer
+     * @param context routing context
+     * @param pathParam name of path param
+     * @return value of path param as integer
+     */
+    public static Integer parseIntegerPathParam(RoutingContext context, String pathParam)
+    {
+        String value = context.pathParam(pathParam);
+        if (value == null)
+        {
+            throw wrapHttpException(HttpResponseStatus.BAD_REQUEST,
+                                    pathParam + " is required but not supplied");
+        }
+
+        return Integer.parseInt(value);
+    }
+
     protected <V> void updateJmxMetric(AsyncResult<V> result,
                                        JmxOperationsMetrics jmxOperationsMetrics,
                                        String operationName,

@@ -221,4 +221,13 @@ public class CassandraStorageOperations implements StorageOperations
         int preemptiveOpenInterval = jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME).getSSTablePreemptiveOpenIntervalInMB();
         return new GetPreemptiveOpenIntervalResponse(preemptiveOpenInterval);
     }
+
+    @Override
+    public GetPreemptiveOpenIntervalResponse setSSTablePreemptiveOpenIntervalInMB(int preemptiveOpenInterval)
+    {
+        requireNonNull(preemptiveOpenInterval, "preemptiveOpenInterval must be non-null");
+        jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME).setSSTablePreemptiveOpenIntervalInMB(preemptiveOpenInterval);
+        // Return the updated value in response
+        return new GetPreemptiveOpenIntervalResponse(preemptiveOpenInterval);
+    }
 }

@@ -105,7 +105,14 @@ public interface StorageOperations
     }
 
     /**
-     * @return sstable's preemptive open interval value
+     * @return C* sstable_preemptive_open_interval value
      */
     GetPreemptiveOpenIntervalResponse getSSTablePreemptiveOpenIntervalInMB();
+
+    /**
+     * Update C* sstable_preemptive_open_interval value
+     * @param intervalInMB new value for sstable_preemptive_open_interval
+     * @return updated value
+     */
+    GetPreemptiveOpenIntervalResponse setSSTablePreemptiveOpenIntervalInMB(int intervalInMB);
 }

@@ -1452,6 +1452,21 @@ abstract class SidecarClientTest
 
         assertThat(result).isNotNull();
         assertThat(result.sstablePreemptiveOpenIntervalInMB()).isNotNull().isEqualTo(30);
+        validateResponseServed("/api/v1/cassandra/sstable/preemptive-open-interval");
+    }
+
+    @Test
+    public void testSetPreemptiveOpenInterval() throws Exception
+    {
+        String responseAsString = "{\"SSTablePreemptiveOpenIntervalInMB\":40}";
+
+        MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(responseAsString);
+        enqueue(response);
+        GetPreemptiveOpenIntervalResponse result = client.setPreemptiveOpenInterval(40).get();
+
+        assertThat(result).isNotNull();
+        assertThat(result.sstablePreemptiveOpenIntervalInMB()).isNotNull().isEqualTo(40);
+        validateResponseServed("/api/v1/cassandra/sstable/preemptive-open-interval/40");
     }
 
     private void enqueue(MockResponse response)

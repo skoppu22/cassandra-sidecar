@@ -165,4 +165,10 @@ public class GossipDependentStorageJmxOperations implements StorageJmxOperations
     {
         return delegate.getSSTablePreemptiveOpenIntervalInMB();
     }
+
+    @Override
+    public void setSSTablePreemptiveOpenIntervalInMB(int intervalInMB)
+    {
+        delegate.setSSTablePreemptiveOpenIntervalInMB(intervalInMB);
+    }
 }

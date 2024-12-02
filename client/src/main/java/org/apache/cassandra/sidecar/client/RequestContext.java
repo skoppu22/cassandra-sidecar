@@ -42,6 +42,7 @@ import org.apache.cassandra.sidecar.common.request.Request;
 import org.apache.cassandra.sidecar.common.request.RingRequest;
 import org.apache.cassandra.sidecar.common.request.SSTableComponentRequest;
 import org.apache.cassandra.sidecar.common.request.SchemaRequest;
+import org.apache.cassandra.sidecar.common.request.SetPreemptiveOpenIntervalRequest;
 import org.apache.cassandra.sidecar.common.request.SidecarHealthRequest;
 import org.apache.cassandra.sidecar.common.request.TimeSkewRequest;
 import org.apache.cassandra.sidecar.common.request.TokenRangeReplicasRequest;
@@ -495,6 +496,16 @@ public class RequestContext
         public Builder getPreemptiveOpenIntervalRequest()
         {
             return request(new GetPreemptiveOpenIntervalRequest());
+        }
+
+        /**
+         * Sets the {@code request} to be a {@link SetPreemptiveOpenIntervalRequest} and returns a reference to this builder
+         * enabling method chaining
+         * @return a reference to this builder
+         */
+        public Builder setPreemptiveOpenIntervalRequest(int preemptiveOpenInterval)
+        {
+            return request(new SetPreemptiveOpenIntervalRequest(preemptiveOpenInterval));
         }
 
         /**

@@ -165,4 +165,10 @@ public interface StorageJmxOperations
      * @return the same value returned by the JMX operation
      */
     int getSSTablePreemptiveOpenIntervalInMB();
+
+    /**
+     * Invokes C* StorageServiceMBean's JMX function setSSTablePreemptiveOpenIntervalInMB
+     * @param intervalInMB updated value
+     */
+    void setSSTablePreemptiveOpenIntervalInMB(int intervalInMB);
 }
