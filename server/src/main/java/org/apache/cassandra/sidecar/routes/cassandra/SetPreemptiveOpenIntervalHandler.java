@@ -82,7 +82,9 @@ public class SetPreemptiveOpenIntervalHandler extends AbstractHandler<Integer>
         .onFailure(cause -> processFailure(cause, context, host, remoteAddress, preemptiveOpenIntervalInMB));
     }
 
-    protected Future<GetPreemptiveOpenIntervalResponse> setSSTablePreemptiveOpenInterval(String host, SocketAddress remoteAddress, Integer preemptiveOpenIntervalInMB)
+    protected Future<GetPreemptiveOpenIntervalResponse> setSSTablePreemptiveOpenInterval(String host,
+                                                                                         SocketAddress remoteAddress,
+                                                                                         Integer preemptiveOpenIntervalInMB)
     {
         long startTime = System.nanoTime();
         StorageOperations storageOperations = getStorageOperations(host);
@@ -92,6 +94,6 @@ public class SetPreemptiveOpenIntervalHandler extends AbstractHandler<Integer>
 
         return executorPools.service()
                             .executeBlocking(() -> storageOperations.setSSTablePreemptiveOpenIntervalInMB(preemptiveOpenIntervalInMB))
-                            .onComplete(ar -> updateJmxMetric(ar, jmxOperationsMetrics,"setSSTablePreemptiveOpenInterval", startTime));
+                            .onComplete(ar -> updateJmxMetric(ar, jmxOperationsMetrics, "setSSTablePreemptiveOpenInterval", startTime));
     }
 }

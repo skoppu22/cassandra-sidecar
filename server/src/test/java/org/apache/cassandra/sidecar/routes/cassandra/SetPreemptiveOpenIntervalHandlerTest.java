@@ -33,13 +33,14 @@ import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERR
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 
 @ExtendWith(VertxExtension.class)
 class SetPreemptiveOpenIntervalHandlerTest extends JmxCommonTest
 {
     private static final String testRoute = "/api/v1/cassandra/sstable/preemptive-open-interval";
+
     @Test
     void testWithoutInstanceId(VertxTestContext context)
     {
