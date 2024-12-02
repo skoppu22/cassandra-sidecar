@@ -44,6 +44,9 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
     @JsonProperty("staging_dir")
     protected final String stagingDir;
 
+    @JsonProperty("cdc_dir")
+    protected final String cdcDir;
+
     @JsonProperty("jmx_host")
     protected final String jmxHost;
 
@@ -66,6 +69,7 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
         this.port = 9042;
         this.dataDirs = null;
         this.stagingDir = null;
+        this.cdcDir = null;
         this.jmxHost = null;
         this.jmxPort = 0;
         this.jmxSslEnabled = false;
@@ -78,6 +82,7 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
                                      int port,
                                      List<String> dataDirs,
                                      String stagingDir,
+                                     String cdcDir,
                                      String jmxHost,
                                      int jmxPort,
                                      boolean jmxSslEnabled,
@@ -89,6 +94,7 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
         this.port = port;
         this.dataDirs = Collections.unmodifiableList(dataDirs);
         this.stagingDir = stagingDir;
+        this.cdcDir = cdcDir;
         this.jmxHost = jmxHost;
         this.jmxPort = jmxPort;
         this.jmxSslEnabled = jmxSslEnabled;
@@ -144,6 +150,16 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
     public String stagingDir()
     {
         return stagingDir;
+    }
+
+    /**
+     * @return cdc directory of the cassandra instance
+     */
+    @Override
+    @JsonProperty("cdc_dir")
+    public String cdcDir()
+    {
+        return cdcDir;
     }
 
     /**

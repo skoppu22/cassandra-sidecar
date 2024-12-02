@@ -18,6 +18,8 @@
 
 package org.apache.cassandra.sidecar.common.utils;
 
+import java.util.function.Supplier;
+
 /**
  * A class to prevent introducing a dependency to guava in common and client
  */
@@ -40,6 +42,21 @@ public class Preconditions
     }
 
     /**
+     * Similar to {@link #checkArgument(boolean, String)}, but allows to evaluate the error message lazily
+     *
+     * @param validCondition the condition to evaluate
+     * @param errorMessageSupplier supplies the error message to use for the {@link IllegalArgumentException}
+     * @throws IllegalArgumentException when the condition is not valid (i.e. {@code false})
+     */
+    public static void checkArgument(boolean validCondition, Supplier<String> errorMessageSupplier)
+    {
+        if (!validCondition)
+        {
+            throw new IllegalArgumentException(errorMessageSupplier.get());
+        }
+    }
+
+    /**
      * Throws an {@link IllegalStateException} when the {@code validCondition} is {@code false}, otherwise
      * no action is taken.
      *
@@ -51,6 +68,20 @@ public class Preconditions
         if (!validCondition)
         {
             throw new IllegalStateException(errorMessage);
+        }
+    }
+
+    /**
+     * Similar to {@link #checkState(boolean, String)}, but allows to evaluate the error message lazily
+     *
+     * @param validCondition the condition to evaluate
+     * @param errorMessageSupplier supplies the error message to use for the {@link IllegalStateException}
+     */
+    public static void checkState(boolean validCondition, Supplier<String> errorMessageSupplier)
+    {
+        if (!validCondition)
+        {
+            throw new IllegalStateException(errorMessageSupplier.get());
         }
     }
 }

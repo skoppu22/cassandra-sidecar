@@ -57,6 +57,11 @@ public interface InstanceMetadata
     String stagingDir();
 
     /**
+     * @return cdc directory of the cassandra instance
+     */
+    String cdcDir();
+
+    /**
      * @return a {@link CassandraAdapterDelegate} specific for the instance
      */
     @Nullable

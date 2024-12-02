@@ -109,6 +109,13 @@ public final class ApiEndpointsV1
     public static final String ABORT_RESTORE_JOB_ROUTE = RESTORE_JOB_ROUTE + ABORT;
     public static final String RESTORE_JOB_PROGRESS_ROUTE = RESTORE_JOB_ROUTE + PROGRESS;
 
+    // CDC APIs
+    public static final String CDC_PATH = "/cdc";
+    public static final String SEGMENT_PATH_PARAM = ":segment";
+    public static final String LIST_CDC_SEGMENTS_ROUTE = API_V1 + CDC_PATH + "/segments";
+    public static final String STREAM_CDC_SEGMENTS_ROUTE = LIST_CDC_SEGMENTS_ROUTE + "/" + SEGMENT_PATH_PARAM;
+
+
     public static final String CONNECTED_CLIENT_STATS_ROUTE = API_V1 + CASSANDRA + "/stats/connected-clients";
 
     private ApiEndpointsV1()

@@ -96,7 +96,7 @@ public class HttpRangeTest
         {
             HttpRange.parseHeader(rangeHeader, Long.MAX_VALUE);
         });
-        String msg = "Range does not satisfy boundary requirements";
+        String msg = "Range does not satisfy boundary requirements. range=[9223372036854775807, 9223372036854775806]";
         assertEquals(msg, thrownException.getMessage());
     }
 
@@ -108,7 +108,7 @@ public class HttpRangeTest
         {
             HttpRange.parseHeader(rangeHeader, Long.MAX_VALUE);
         });
-        String msg = "Range does not satisfy boundary requirements";
+        String msg = "Range does not satisfy boundary requirements. range=[9, 2]";
         assertEquals(msg, thrownException.getMessage());
     }
 

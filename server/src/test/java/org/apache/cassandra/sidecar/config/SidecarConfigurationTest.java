@@ -305,6 +305,15 @@ class SidecarConfigurationTest
     }
 
     @Test
+    void testCdcCofiguration() throws IOException
+    {
+        Path yamlPath = yaml("config/sidecar_cdc.yaml");
+        SidecarConfigurationImpl sidecarConfiguration = SidecarConfigurationImpl.readYamlConfiguration(yamlPath);
+        assertThat(sidecarConfiguration).isNotNull();
+        assertThat(sidecarConfiguration.serviceConfiguration().cdcConfiguration().segmentHardlinkCacheExpiryInSecs()).isEqualTo(60L);
+    }
+
+    @Test
     void testAccessControlConfiguration() throws Exception
     {
         Path yamlPath = yaml("config/sidecar_multiple_instances.yaml");

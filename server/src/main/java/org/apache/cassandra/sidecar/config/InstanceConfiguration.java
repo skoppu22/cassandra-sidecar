@@ -51,6 +51,11 @@ public interface InstanceConfiguration
     String stagingDir();
 
     /**
+     * @return cdc directory of the cassandra instance
+     */
+    String cdcDir();
+
+    /**
      * @return the host address of the JMX service for the Cassandra instance
      */
     String jmxHost();

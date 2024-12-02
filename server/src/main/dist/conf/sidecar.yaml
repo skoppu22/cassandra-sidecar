@@ -26,6 +26,7 @@ cassandra_instances:
     data_dirs:
       - ~/.ccm/test/node1/data0
     staging_dir: ~/.ccm/test/node1/sstable-staging
+    cdc_dir: ~/.ccm/test/node1/cdc_raw
     jmx_host: 127.0.0.1
     jmx_port: 7100
     jmx_ssl_enabled: false
@@ -37,6 +38,7 @@ cassandra_instances:
     data_dirs:
       - ~/.ccm/test/node2/data0
     staging_dir: ~/.ccm/test/node2/sstable-staging
+    cdc_dir: ~/.ccm/test/node2/cdc_raw
     jmx_host: 127.0.0.1
     jmx_port: 7200
     jmx_ssl_enabled: false
@@ -48,6 +50,7 @@ cassandra_instances:
     data_dirs:
       - ~/.ccm/test/node3/data0
     staging_dir: ~/.ccm/test/node3/sstable-staging
+    cdc_dir: ~/.ccm/test/node3/cdc_raw
     jmx_host: 127.0.0.1
     jmx_port: 7300
     jmx_ssl_enabled: false
@@ -86,6 +89,8 @@ sidecar:
     snapshot_list_cache:
       expire_after_access_millis: 7200000 # 2 hours
       maximum_size: 10000
+  cdc:
+    segment_hardlink_cache_expiry_in_secs: 300 # 5 mins
   worker_pools:
     service:
       name: "sidecar-worker-pool"

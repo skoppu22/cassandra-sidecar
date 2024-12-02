@@ -42,6 +42,7 @@ import org.apache.cassandra.sidecar.common.response.NodeSettings;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.common.server.dns.DnsResolver;
 import org.apache.cassandra.sidecar.config.AccessControlConfiguration;
+import org.apache.cassandra.sidecar.config.CdcConfiguration;
 import org.apache.cassandra.sidecar.config.HealthCheckConfiguration;
 import org.apache.cassandra.sidecar.config.RestoreJobConfiguration;
 import org.apache.cassandra.sidecar.config.SSTableUploadConfiguration;
@@ -51,6 +52,7 @@ import org.apache.cassandra.sidecar.config.SidecarConfiguration;
 import org.apache.cassandra.sidecar.config.SslConfiguration;
 import org.apache.cassandra.sidecar.config.ThrottleConfiguration;
 import org.apache.cassandra.sidecar.config.yaml.AccessControlConfigurationImpl;
+import org.apache.cassandra.sidecar.config.yaml.CdcConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.HealthCheckConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.RestoreJobConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.SSTableUploadConfigurationImpl;
@@ -114,6 +116,7 @@ public class TestModule extends AbstractModule
     {
         ThrottleConfiguration throttleConfiguration = new ThrottleConfigurationImpl(5, 5);
         SSTableUploadConfiguration uploadConfiguration = new SSTableUploadConfigurationImpl(0F);
+        CdcConfiguration cdcConfiguration = new CdcConfigurationImpl(1L);
         SchemaKeyspaceConfiguration schemaKeyspaceConfiguration =
         SchemaKeyspaceConfigurationImpl.builder()
                                        .isEnabled(true)
@@ -126,6 +129,7 @@ public class TestModule extends AbstractModule
                                 .throttleConfiguration(throttleConfiguration)
                                 .schemaKeyspaceConfiguration(schemaKeyspaceConfiguration)
                                 .sstableUploadConfiguration(uploadConfiguration)
+                                .cdcConfiguration(cdcConfiguration)
                                 .build();
         RestoreJobConfiguration restoreJobConfiguration =
         RestoreJobConfigurationImpl.builder()
@@ -167,16 +171,19 @@ public class TestModule extends AbstractModule
                                                   1,
                                                   "src/test/resources/instance1/data",
                                                   "src/test/resources/instance1/sstable-staging",
+                                                  "src/test/resources/instance1/cdc_raw",
                                                   true);
         InstanceMetadata instance2 = mockInstance("localhost2",
                                                   2,
                                                   "src/test/resources/instance2/data",
                                                   "src/test/resources/instance2/sstable-staging",
+                                                  "src/test/resources/instance2/cdc_raw",
                                                   false);
         InstanceMetadata instance3 = mockInstance("localhost3",
                                                   3,
                                                   "src/test/resources/instance3/data",
                                                   "src/test/resources/instance3/sstable-staging",
+                                                  "src/test/resources/instance3/cdc_raw",
                                                   true);
         final List<InstanceMetadata> instanceMetas = new ArrayList<>();
         instanceMetas.add(instance1);
@@ -185,13 +192,14 @@ public class TestModule extends AbstractModule
         return instanceMetas;
     }
 
-    private InstanceMetadata mockInstance(String host, int id, String dataDir, String stagingDir, boolean isUp)
+    private InstanceMetadata mockInstance(String host, int id, String dataDir, String stagingDir, String cdcDir, boolean isUp)
     {
         InstanceMetadata instanceMeta = mock(InstanceMetadata.class);
         when(instanceMeta.id()).thenReturn(id);
         when(instanceMeta.host()).thenReturn(host);
         when(instanceMeta.port()).thenReturn(6475);
         when(instanceMeta.stagingDir()).thenReturn(stagingDir);
+        when(instanceMeta.cdcDir()).thenReturn(cdcDir);
         List<String> dataDirectories = Collections.singletonList(dataDir);
         when(instanceMeta.dataDirs()).thenReturn(dataDirectories);
         when(instanceMeta.metrics()).thenReturn(new InstanceMetricsImpl(registry(id)));
