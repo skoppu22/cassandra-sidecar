@@ -107,6 +107,8 @@ import org.apache.cassandra.sidecar.routes.TimeSkewHandler;
 import org.apache.cassandra.sidecar.routes.TokenRangeReplicaMapHandler;
 import org.apache.cassandra.sidecar.routes.cassandra.GetPreemptiveOpenIntervalHandler;
 import org.apache.cassandra.sidecar.routes.cassandra.NodeSettingsHandler;
+import org.apache.cassandra.sidecar.routes.cdc.ListCdcDirHandler;
+import org.apache.cassandra.sidecar.routes.cdc.StreamCdcSegmentHandler;
 import org.apache.cassandra.sidecar.routes.restore.AbortRestoreJobHandler;
 import org.apache.cassandra.sidecar.routes.restore.CreateRestoreJobHandler;
 import org.apache.cassandra.sidecar.routes.restore.CreateRestoreSliceHandler;
@@ -256,6 +258,8 @@ public class MainModule extends AbstractModule
                               SSTableUploadHandler ssTableUploadHandler,
                               SSTableImportHandler ssTableImportHandler,
                               SSTableCleanupHandler ssTableCleanupHandler,
+                              StreamCdcSegmentHandler streamCdcSegmentHandler,
+                              ListCdcDirHandler listCdcDirHandler,
                               RestoreRequestValidationHandler validateRestoreJobRequest,
                               DiskSpaceProtectionHandler diskSpaceProtection,
                               ValidateTableExistenceHandler validateTableExistence,
@@ -419,6 +423,12 @@ public class MainModule extends AbstractModule
               .handler(validateRestoreJobRequest)
               .handler(restoreJobProgressHandler);
 
+        // CDC APIs
+        router.get(ApiEndpointsV1.LIST_CDC_SEGMENTS_ROUTE)
+              .handler(listCdcDirHandler);
+        router.get(ApiEndpointsV1.STREAM_CDC_SEGMENTS_ROUTE)
+              .handler(streamCdcSegmentHandler);
+              
         router.get(ApiEndpointsV1.SSTABLE_PREEMPTIVE_OPEN_INTERVAL_ROUTE)
               .handler(getPreemptiveOpenIntervalHandler);
 
@@ -456,7 +466,7 @@ public class MainModule extends AbstractModule
                                                  DriverUtils driverUtils)
     {
         CQLSessionProviderImpl cqlSessionProvider = new CQLSessionProviderImpl(sidecarConfiguration,
-                                                                               new NettyOptions(),
+                                                                               NettyOptions.DEFAULT_INSTANCE,
                                                                                driverUtils);
         vertx.eventBus().localConsumer(ON_SERVER_STOP.address(), message -> cqlSessionProvider.close());
         return cqlSessionProvider;
@@ -705,6 +715,7 @@ public class MainModule extends AbstractModule
                                    .port(port)
                                    .dataDirs(cassandraInstance.dataDirs())
                                    .stagingDir(cassandraInstance.stagingDir())
+                                   .cdcDir(cassandraInstance.cdcDir())
                                    .delegate(delegate)
                                    .metricRegistry(instanceSpecificRegistry)
                                    .build();

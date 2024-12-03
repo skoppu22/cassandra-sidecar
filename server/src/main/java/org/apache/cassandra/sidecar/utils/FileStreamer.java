@@ -42,6 +42,7 @@ import org.apache.cassandra.sidecar.models.HttpResponse;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static io.netty.handler.codec.http.HttpResponseStatus.REQUESTED_RANGE_NOT_SATISFIABLE;
 import static io.netty.handler.codec.http.HttpResponseStatus.TOO_MANY_REQUESTS;
+import static org.apache.cassandra.sidecar.utils.HttpExceptions.wrapHttpException;
 import static org.apache.cassandra.sidecar.utils.MetricUtils.parseSSTableComponent;
 
 /**
@@ -219,7 +220,7 @@ public class FileStreamer
      * @param fileLength  The length of the file
      * @return a succeeded future when the parsing is successful, a failed future when the range parsing fails
      */
-    private Future<HttpRange> parseRangeHeader(String rangeHeader, long fileLength)
+    public Future<HttpRange> parseRangeHeader(String rangeHeader, long fileLength)
     {
         HttpRange fr = HttpRange.of(0, fileLength - 1);
         if (rangeHeader == null)
@@ -236,7 +237,7 @@ public class FileStreamer
         catch (IllegalArgumentException | RangeException | UnsupportedOperationException e)
         {
             LOGGER.error("Failed to parse header '{}'", rangeHeader, e);
-            return Future.failedFuture(new HttpException(REQUESTED_RANGE_NOT_SATISFIABLE.code()));
+            return Future.failedFuture(wrapHttpException(REQUESTED_RANGE_NOT_SATISFIABLE, e.getMessage(), e));
         }
     }
 }

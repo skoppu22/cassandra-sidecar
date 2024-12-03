@@ -87,4 +87,5 @@ public interface SidecarConfiguration
      * @return the configuration for vert.x
      */
     @Nullable VertxConfiguration vertxConfiguration();
+
 }

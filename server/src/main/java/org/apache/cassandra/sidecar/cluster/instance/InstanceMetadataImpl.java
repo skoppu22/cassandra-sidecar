@@ -42,6 +42,7 @@ public class InstanceMetadataImpl implements InstanceMetadata
     private final int port;
     private final List<String> dataDirs;
     private final String stagingDir;
+    private final String cdcDir;
     @Nullable
     private final CassandraAdapterDelegate delegate;
     private final InstanceMetrics metrics;
@@ -55,6 +56,7 @@ public class InstanceMetadataImpl implements InstanceMetadata
                                    .map(FileUtils::maybeResolveHomeDirectory)
                                    .collect(Collectors.collectingAndThen(Collectors.toList(), Collections::unmodifiableList));
         stagingDir = FileUtils.maybeResolveHomeDirectory(builder.stagingDir);
+        cdcDir = builder().cdcDir;
         delegate = builder.delegate;
         metrics = builder.metrics;
     }
@@ -90,6 +92,12 @@ public class InstanceMetadataImpl implements InstanceMetadata
     }
 
     @Override
+    public String cdcDir()
+    {
+        return cdcDir;
+    }
+
+    @Override
     public @Nullable CassandraAdapterDelegate delegate()
     {
         return delegate;
@@ -116,6 +124,7 @@ public class InstanceMetadataImpl implements InstanceMetadata
         protected int port;
         protected List<String> dataDirs;
         protected String stagingDir;
+        protected String cdcDir;
         protected CassandraAdapterDelegate delegate;
         protected MetricRegistry metricRegistry;
         protected InstanceMetrics metrics;
@@ -131,6 +140,7 @@ public class InstanceMetadataImpl implements InstanceMetadata
             port = instanceMetadata.port;
             dataDirs = new ArrayList<>(instanceMetadata.dataDirs);
             stagingDir = instanceMetadata.stagingDir;
+            cdcDir = instanceMetadata.cdcDir;
             delegate = instanceMetadata.delegate;
             metrics = instanceMetadata.metrics;
         }
@@ -194,6 +204,17 @@ public class InstanceMetadataImpl implements InstanceMetadata
         public Builder stagingDir(String stagingDir)
         {
             return update(b -> b.stagingDir = stagingDir);
+        }
+
+        /**
+         * Sets the {@code cdcDir} and returns a reference to this Builder enabling method chaining.
+         *
+         * @param cdcDir the {@code cdcDir} to set
+         * @return a reference to this Builder
+         */
+        public Builder cdcDir(String cdcDir)
+        {
+            return update(b -> b.cdcDir = cdcDir);
         }
 
         /**

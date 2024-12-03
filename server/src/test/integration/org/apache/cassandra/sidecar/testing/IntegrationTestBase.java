@@ -97,8 +97,11 @@ public abstract class IntegrationTestBase
     protected File tempDir;
     protected CertificateBundle ca;
     protected Path serverKeystorePath;
+    protected String serverKeystorePassword = "password";
     protected Path clientKeystorePath;
+    protected String clientKeystorePassword = "password";
     protected Path truststorePath;
+    protected String truststorePassword = "password";
     protected WebClient client;
     protected CassandraSidecarTestContext sidecarTestContext;
     protected Injector injector;
@@ -109,7 +112,8 @@ public abstract class IntegrationTestBase
     {
         testExceptions.clear();
 
-        setCAs();
+        ca = ca();
+        truststorePath = truststorePath();
         serverKeystorePath = serverKeystorePath();
         clientKeystorePath = clientKeystorePath(ADMIN_IDENTITY);
 
@@ -122,7 +126,7 @@ public abstract class IntegrationTestBase
         injector = Guice.createInjector(Modules.override(new MainModule()).with(integrationTestModule));
         vertx = injector.getInstance(Vertx.class);
         sidecarTestContext = CassandraSidecarTestContext.from(vertx, cassandraTestContext, DnsResolver.DEFAULT,
-                                                              getNumInstancesToManage(clusterSize));
+                                                              getNumInstancesToManage(clusterSize), null);
 
         integrationTestModule.setCassandraTestContext(sidecarTestContext);
 
@@ -393,15 +397,16 @@ public abstract class IntegrationTestBase
                        .forEach(instanceMetadata -> instanceMetadata.delegate().healthCheck());
     }
 
-    protected void setCAs() throws Exception
+    protected CertificateBundle ca() throws Exception
     {
-        ca
-        = CertificateBuilder.builder()
-                            .subject("CN=Apache cassandra Root CA, OU=Certification Authority, O=Unknown, C=Unknown")
-                            .isCertificateAuthority(true)
-                            .buildSelfSigned();
-        truststorePath
-        = ca.toTempKeyStorePath(tempDir.toPath(), "password".toCharArray(), "password".toCharArray());
+        return CertificateBuilder.builder()
+                                 .subject("CN=Apache cassandra Root CA, OU=Certification Authority, O=Unknown, C=Unknown")
+                                 .isCertificateAuthority(true)
+                                 .buildSelfSigned();
+    }
+    protected Path truststorePath() throws Exception
+    {
+        return ca.toTempKeyStorePath(tempDir.toPath(), truststorePassword.toCharArray(), truststorePassword.toCharArray());
     }
 
     protected Path serverKeystorePath() throws Exception
@@ -412,7 +417,7 @@ public abstract class IntegrationTestBase
                             .addSanDnsName("localhost")
                             .addSanIpAddress("127.0.0.1")
                             .buildIssuedBy(ca);
-        return keystore.toTempKeyStorePath(tempDir.toPath(), "password".toCharArray(), "password".toCharArray());
+        return keystore.toTempKeyStorePath(tempDir.toPath(), serverKeystorePassword.toCharArray(), serverKeystorePassword.toCharArray());
     }
 
     protected Path clientKeystorePath(String identity) throws Exception
@@ -433,15 +438,15 @@ public abstract class IntegrationTestBase
             builder.notAfter(Date.from(Instant.now().minus(1, ChronoUnit.DAYS)));
         }
         CertificateBundle clientKeystore = builder.buildIssuedBy(ca);
-        return clientKeystore.toTempKeyStorePath(tempDir.toPath(), "password".toCharArray(), "password".toCharArray());
+        return clientKeystore.toTempKeyStorePath(tempDir.toPath(), clientKeystorePassword.toCharArray(), clientKeystorePassword.toCharArray());
     }
 
     protected WebClient createClient(Path clientKeystorePath, Path truststorePath)
     {
         WebClientOptions options = new WebClientOptions();
         options.setSsl(true);
-        options.setKeyStoreOptions(new JksOptions().setPath(clientKeystorePath.toAbsolutePath().toString()).setPassword("password"));
-        options.setTrustStoreOptions(new JksOptions().setPath(truststorePath.toAbsolutePath().toString()).setPassword("password"));
+        options.setKeyStoreOptions(new JksOptions().setPath(clientKeystorePath.toAbsolutePath().toString()).setPassword(clientKeystorePassword));
+        options.setTrustStoreOptions(new JksOptions().setPath(truststorePath.toAbsolutePath().toString()).setPassword(truststorePassword));
         return WebClient.create(vertx, options);
     }
 }
