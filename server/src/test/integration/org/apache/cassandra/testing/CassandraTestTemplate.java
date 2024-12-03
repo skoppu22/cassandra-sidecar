@@ -258,7 +258,7 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
             while (tokenizer.hasMoreTokens())
             {
                 String[] entry = tokenizer.nextToken().split("=");
-                parsedYamlProps.put(entry[0], entry[1]);
+                parsedYamlProps.put(entry[0].trim(), entry[1].trim());
             }
 
             return parsedYamlProps;

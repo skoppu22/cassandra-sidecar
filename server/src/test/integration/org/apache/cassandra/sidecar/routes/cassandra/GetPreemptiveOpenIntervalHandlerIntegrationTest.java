@@ -41,8 +41,16 @@ public class GetPreemptiveOpenIntervalHandlerIntegrationTest extends Integration
 {
     private static final String testRoute = "/api/v1/cassandra/sstable/preemptive-open-interval";
 
+    @CassandraIntegrationTest
+    void testDefaultValue(CassandraTestContext context, VertxTestContext testContext)
+    {
+        client.get(server.actualPort(), "127.0.0.1", testRoute)
+              .expect(ResponsePredicate.SC_OK)
+              .send(testContext.succeeding(response -> verifyResponse(context, testContext, response, 50)));
+    }
+
     @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=60")
-    void testRetrieveConfigValue60(CassandraTestContext context, VertxTestContext testContext)
+    void testPreemptiveOpenInterval60(CassandraTestContext context, VertxTestContext testContext)
     {
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
@@ -50,11 +58,19 @@ public class GetPreemptiveOpenIntervalHandlerIntegrationTest extends Integration
     }
 
     @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=70")
-    void testRetrieveConfigValue70(CassandraTestContext context, VertxTestContext testContext)
+    void testPreemptiveOpenInterval70(CassandraTestContext context, VertxTestContext testContext)
     {
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
               .send(testContext.succeeding(response -> verifyResponse(context, testContext, response, 70)));
+    }
+
+    @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=-1")
+    void testPreemptiveOpenIntervalNegative(CassandraTestContext context, VertxTestContext testContext)
+    {
+        client.get(server.actualPort(), "127.0.0.1", testRoute)
+              .expect(ResponsePredicate.SC_OK)
+              .send(testContext.succeeding(response -> verifyResponse(context, testContext, response, -1)));
     }
 
     void verifyResponse(CassandraTestContext context, VertxTestContext testContext, HttpResponse<Buffer> response, int expectedValue)
