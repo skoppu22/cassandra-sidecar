@@ -28,7 +28,6 @@ import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
 import org.apache.cassandra.sidecar.testing.IntegrationTestBase;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
-import org.apache.cassandra.testing.CassandraTestContext;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,38 +41,38 @@ public class GetPreemptiveOpenIntervalHandlerIntegrationTest extends Integration
     private static final String testRoute = "/api/v1/cassandra/sstable/preemptive-open-interval";
 
     @CassandraIntegrationTest
-    void testDefaultValue(CassandraTestContext context, VertxTestContext testContext)
+    void testDefaultValue(VertxTestContext testContext)
     {
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
-              .send(testContext.succeeding(response -> verifyResponse(context, testContext, response, 50)));
+              .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, 50)));
     }
 
     @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=60")
-    void testPreemptiveOpenInterval60(CassandraTestContext context, VertxTestContext testContext)
+    void testPreemptiveOpenInterval60(VertxTestContext testContext)
     {
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
-              .send(testContext.succeeding(response -> verifyResponse(context, testContext, response, 60)));
+              .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, 60)));
     }
 
     @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=70")
-    void testPreemptiveOpenInterval70(CassandraTestContext context, VertxTestContext testContext)
+    void testPreemptiveOpenInterval70(VertxTestContext testContext)
     {
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
-              .send(testContext.succeeding(response -> verifyResponse(context, testContext, response, 70)));
+              .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, 70)));
     }
 
     @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=-1")
-    void testPreemptiveOpenIntervalNegative(CassandraTestContext context, VertxTestContext testContext)
+    void testPreemptiveOpenIntervalNegative(VertxTestContext testContext)
     {
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
-              .send(testContext.succeeding(response -> verifyResponse(context, testContext, response, -1)));
+              .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, -1)));
     }
 
-    void verifyResponse(CassandraTestContext context, VertxTestContext testContext, HttpResponse<Buffer> response, int expectedValue)
+    void verifyValidResponse(VertxTestContext testContext, HttpResponse<Buffer> response, int expectedValue)
     {
         testContext.verify(() -> {
             JsonObject responseJson = response.bodyAsJsonObject();
