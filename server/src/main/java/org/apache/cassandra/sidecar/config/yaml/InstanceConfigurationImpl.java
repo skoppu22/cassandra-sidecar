@@ -38,17 +38,14 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
     @JsonProperty("port")
     protected final int port;
 
-    @JsonProperty("username")
-    protected final String username;
-
-    @JsonProperty("password")
-    protected final String password;
-
     @JsonProperty("data_dirs")
     protected final List<String> dataDirs;
 
     @JsonProperty("staging_dir")
     protected final String stagingDir;
+
+    @JsonProperty("cdc_dir")
+    protected final String cdcDir;
 
     @JsonProperty("jmx_host")
     protected final String jmxHost;
@@ -70,10 +67,9 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
         this.id = 0;
         this.host = null;
         this.port = 9042;
-        this.username = null;
-        this.password = null;
         this.dataDirs = null;
         this.stagingDir = null;
+        this.cdcDir = null;
         this.jmxHost = null;
         this.jmxPort = 0;
         this.jmxSslEnabled = false;
@@ -82,25 +78,23 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
     }
 
     public InstanceConfigurationImpl(int id,
-                                        String host,
-                                        int port,
-                                        String username,
-                                        String password,
-                                        List<String> dataDirs,
-                                        String stagingDir,
-                                        String jmxHost,
-                                        int jmxPort,
-                                        boolean jmxSslEnabled,
-                                        String jmxRole,
-                                        String jmxRolePassword)
+                                     String host,
+                                     int port,
+                                     List<String> dataDirs,
+                                     String stagingDir,
+                                     String cdcDir,
+                                     String jmxHost,
+                                     int jmxPort,
+                                     boolean jmxSslEnabled,
+                                     String jmxRole,
+                                     String jmxRolePassword)
     {
         this.id = id;
         this.host = host;
         this.port = port;
-        this.username = username;
-        this.password = password;
         this.dataDirs = Collections.unmodifiableList(dataDirs);
         this.stagingDir = stagingDir;
+        this.cdcDir = cdcDir;
         this.jmxHost = jmxHost;
         this.jmxPort = jmxPort;
         this.jmxSslEnabled = jmxSslEnabled;
@@ -139,26 +133,6 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
     }
 
     /**
-     * @return the username used for connecting to the Cassandra instance
-     */
-    @Override
-    @JsonProperty("username")
-    public String username()
-    {
-        return username;
-    }
-
-    /**
-     * @return the password used for connecting to the Cassandra instance
-     */
-    @Override
-    @JsonProperty("password")
-    public String password()
-    {
-        return password;
-    }
-
-    /**
      * @return a list of data directories of cassandra instance
      */
     @Override
@@ -176,6 +150,16 @@ public class InstanceConfigurationImpl implements InstanceConfiguration
     public String stagingDir()
     {
         return stagingDir;
+    }
+
+    /**
+     * @return cdc directory of the cassandra instance
+     */
+    @Override
+    @JsonProperty("cdc_dir")
+    public String cdcDir()
+    {
+        return cdcDir;
     }
 
     /**

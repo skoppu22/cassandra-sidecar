@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.cassandra.sidecar.common.DataObjectBuilder;
+import org.apache.cassandra.sidecar.config.CdcConfiguration;
 import org.apache.cassandra.sidecar.config.JmxConfiguration;
 import org.apache.cassandra.sidecar.config.SSTableImportConfiguration;
 import org.apache.cassandra.sidecar.config.SSTableSnapshotConfiguration;
@@ -34,6 +35,7 @@ import org.apache.cassandra.sidecar.config.ServiceConfiguration;
 import org.apache.cassandra.sidecar.config.ThrottleConfiguration;
 import org.apache.cassandra.sidecar.config.TrafficShapingConfiguration;
 import org.apache.cassandra.sidecar.config.WorkerPoolConfiguration;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Configuration for the Sidecar Service and configuration of the REST endpoints in the service
@@ -64,6 +66,7 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
     private static final String JMX_PROPERTY = "jmx";
     private static final String TRAFFIC_SHAPING_PROPERTY = "traffic_shaping";
     private static final String SCHEMA = "schema";
+    private static final String CDC = "cdc";
     protected static final Map<String, WorkerPoolConfiguration> DEFAULT_WORKER_POOLS_CONFIGURATION
     = Collections.unmodifiableMap(new HashMap<String, WorkerPoolConfiguration>()
     {{
@@ -123,6 +126,9 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
     @JsonProperty(value = SCHEMA)
     protected final SchemaKeyspaceConfiguration schemaKeyspaceConfiguration;
 
+    @JsonProperty(value = CDC)
+    protected final CdcConfiguration cdcConfiguration;
+
     /**
      * Constructs a new {@link ServiceConfigurationImpl} with the default values
      */
@@ -154,6 +160,7 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         jmxConfiguration = builder.jmxConfiguration;
         trafficShapingConfiguration = builder.trafficShapingConfiguration;
         schemaKeyspaceConfiguration = builder.schemaKeyspaceConfiguration;
+        cdcConfiguration = builder.cdcConfiguration;
     }
 
     /**
@@ -316,6 +323,17 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         return schemaKeyspaceConfiguration;
     }
 
+    /**
+     * @return the configuration for cdc
+     */
+    @Override
+    @JsonProperty(value = CDC)
+    @Nullable
+    public CdcConfiguration cdcConfiguration()
+    {
+        return cdcConfiguration;
+    }
+
     public static Builder builder()
     {
         return new Builder();
@@ -343,6 +361,7 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         protected JmxConfiguration jmxConfiguration = new JmxConfigurationImpl();
         protected TrafficShapingConfiguration trafficShapingConfiguration = new TrafficShapingConfigurationImpl();
         protected SchemaKeyspaceConfiguration schemaKeyspaceConfiguration = new SchemaKeyspaceConfigurationImpl();
+        protected CdcConfiguration cdcConfiguration = new CdcConfigurationImpl();
 
         private Builder()
         {
@@ -531,6 +550,18 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         public Builder schemaKeyspaceConfiguration(SchemaKeyspaceConfiguration schemaKeyspaceConfiguration)
         {
             return update(b -> b.schemaKeyspaceConfiguration = schemaKeyspaceConfiguration);
+        }
+
+        /**
+         * Set the {@code cdcConfiguration} and returns a reference to this Builder enabling
+         * method chaining.
+         *
+         * @param configuration th {@code cdcConfiguration} to set
+         * @return a reference to the Builder
+         */
+        public Builder cdcConfiguration(CdcConfiguration configuration)
+        {
+            return update(b -> b.cdcConfiguration = configuration);
         }
 
         /**

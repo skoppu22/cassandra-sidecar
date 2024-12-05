@@ -44,8 +44,10 @@ public class HttpRange
     // An initialized range is always valid; invalid params fail range initialization.
     private HttpRange(final long start, final long end)
     {
-        Preconditions.checkArgument(start >= 0, "Range start can not be negative");
-        Preconditions.checkArgument(end >= start, "Range does not satisfy boundary requirements");
+        Preconditions.checkArgument(start >= 0,
+                                    () -> String.format("Range start can not be negative. range=[%s, %s]", start, end));
+        Preconditions.checkArgument(end >= start,
+                                    () -> String.format("Range does not satisfy boundary requirements. range=[%s, %s]", start, end));
         this.start = start;
         this.end = end;
         long len = end - start + 1; // Assign long max if overflows

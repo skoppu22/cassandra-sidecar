@@ -41,16 +41,6 @@ public interface InstanceConfiguration
     int port();
 
     /**
-     * @return the username used for connecting to the Cassandra instance
-     */
-    String username();
-
-    /**
-     * @return the password used for connecting to the Cassandra instance
-     */
-    String password();
-
-    /**
      * @return a list of data directories of cassandra instance
      */
     List<String> dataDirs();
@@ -59,6 +49,11 @@ public interface InstanceConfiguration
      * @return staging directory for the uploads of the cassandra instance
      */
     String stagingDir();
+
+    /**
+     * @return cdc directory of the cassandra instance
+     */
+    String cdcDir();
 
     /**
      * @return the host address of the JMX service for the Cassandra instance
