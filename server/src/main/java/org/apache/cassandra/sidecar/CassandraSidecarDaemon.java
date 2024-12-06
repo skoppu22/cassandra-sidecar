@@ -19,6 +19,7 @@
 package org.apache.cassandra.sidecar;
 
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import com.google.inject.Guice;
 import org.apache.cassandra.sidecar.server.MainModule;
 import org.apache.cassandra.sidecar.server.Server;
+import org.jetbrains.annotations.VisibleForTesting;
 
 /**
  * Main class for initiating the Cassandra sidecar
@@ -37,23 +39,15 @@ import org.apache.cassandra.sidecar.server.Server;
 public class CassandraSidecarDaemon
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(CassandraSidecarDaemon.class);
+    @VisibleForTesting
+    static Server runningApplication;
 
     public static void main(String[] args)
     {
-        String yamlConfigurationPath = System.getProperty("sidecar.config", "file://./conf/config.yaml");
-
-        Path confPath;
-        try
-        {
-            confPath = Paths.get(new URI(yamlConfigurationPath));
-        }
-        catch (Throwable e)
-        {
-            throw new RuntimeException("Invalid URI: " + yamlConfigurationPath, e);
-        }
+        Path confPath = determineConfigPath();
 
         Server app = Guice.createInjector(new MainModule(confPath)).getInstance(Server.class);
-
+        runningApplication = app;
         app.start().onSuccess(deploymentId -> Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (close(app))
             {
@@ -72,7 +66,8 @@ public class CassandraSidecarDaemon
      * @param app the server
      * @return {@code true} if the server shutdown successfully, {@code false} otherwise
      */
-    private static boolean close(Server app)
+    @VisibleForTesting
+    static boolean close(Server app)
     {
         try
         {
@@ -87,6 +82,38 @@ public class CassandraSidecarDaemon
             LOGGER.warn("Failed to stop Sidecar in 1 minute", ex);
         }
         return false;
+    }
+
+    private static Path determineConfigPath()
+    {
+        Path confPath;
+        String yamlConfigurationPath = System.getProperty("sidecar.config");
+        if (yamlConfigurationPath != null)
+        {
+            try
+            {
+                confPath = Paths.get(new URI(yamlConfigurationPath));
+            }
+            catch (Throwable e)
+            {
+                throw new IllegalArgumentException("Invalid URI: " + yamlConfigurationPath, e);
+            }
+        }
+        else
+        {
+            confPath = Paths.get("conf/sidecar.yaml");
+        }
+        return ensurePathExists(confPath);
+    }
+
+    private static Path ensurePathExists(Path confPath)
+    {
+        if (!Files.exists(confPath))
+        {
+            throw new IllegalArgumentException(String.format("Sidecar configuration file '%s' does not exist",
+                                                             confPath.toAbsolutePath()));
+        }
+        return confPath;
     }
 }
 
