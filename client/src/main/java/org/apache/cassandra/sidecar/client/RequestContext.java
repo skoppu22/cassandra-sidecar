@@ -34,6 +34,7 @@ import org.apache.cassandra.sidecar.common.request.ClearSnapshotRequest;
 import org.apache.cassandra.sidecar.common.request.ConnectedClientStatsRequest;
 import org.apache.cassandra.sidecar.common.request.CreateSnapshotRequest;
 import org.apache.cassandra.sidecar.common.request.GossipInfoRequest;
+import org.apache.cassandra.sidecar.common.request.GossipStatusRequest;
 import org.apache.cassandra.sidecar.common.request.ImportSSTableRequest;
 import org.apache.cassandra.sidecar.common.request.ListSnapshotFilesRequest;
 import org.apache.cassandra.sidecar.common.request.NodeSettingsRequest;
@@ -329,6 +330,14 @@ public class RequestContext
         {
             return request(GOSSIP_INFO_REQUEST);
         }
+
+        /**
+         * Sets the {@code request} to be a {@link GossipStatusRequest} and returns a reference to this Builder enabling
+         * method chaining.
+         *
+         * @return a reference to this Builder
+         */
+        public Builder gossipStatusRequest() { return request(new GossipStatusRequest()); }
 
         /**
          * Sets the {@code request} to be a {@link SSTableComponentRequest} for the given {@code keyspace},

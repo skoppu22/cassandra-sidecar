@@ -98,6 +98,7 @@ import org.apache.cassandra.sidecar.routes.ConnectedClientStatsHandler;
 import org.apache.cassandra.sidecar.routes.DiskSpaceProtectionHandler;
 import org.apache.cassandra.sidecar.routes.FileStreamHandler;
 import org.apache.cassandra.sidecar.routes.GossipInfoHandler;
+import org.apache.cassandra.sidecar.routes.GossipStatusHandler;
 import org.apache.cassandra.sidecar.routes.JsonErrorHandler;
 import org.apache.cassandra.sidecar.routes.RingHandler;
 import org.apache.cassandra.sidecar.routes.RoutingOrder;
@@ -252,6 +253,7 @@ public class MainModule extends AbstractModule
                               TokenRangeReplicaMapHandler tokenRangeHandler,
                               LoggerHandler loggerHandler,
                               GossipInfoHandler gossipInfoHandler,
+                              GossipStatusHandler gossipStatusHandler,
                               TimeSkewHandler timeSkewHandler,
                               NodeSettingsHandler nodeSettingsHandler,
                               SSTableUploadHandler ssTableUploadHandler,
@@ -379,6 +381,9 @@ public class MainModule extends AbstractModule
 
         router.get(ApiEndpointsV1.GOSSIP_INFO_ROUTE)
               .handler(gossipInfoHandler);
+
+        router.get(ApiEndpointsV1.GOSSIP_STATUS_ROUTE)
+              .handler(gossipStatusHandler);
 
         router.get(ApiEndpointsV1.TIME_SKEW_ROUTE)
               .handler(timeSkewHandler);
