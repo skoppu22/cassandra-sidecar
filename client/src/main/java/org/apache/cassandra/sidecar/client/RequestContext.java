@@ -34,6 +34,7 @@ import org.apache.cassandra.sidecar.common.request.CleanSSTableUploadSessionRequ
 import org.apache.cassandra.sidecar.common.request.ClearSnapshotRequest;
 import org.apache.cassandra.sidecar.common.request.ConnectedClientStatsRequest;
 import org.apache.cassandra.sidecar.common.request.CreateSnapshotRequest;
+import org.apache.cassandra.sidecar.common.request.GossipHealthRequest;
 import org.apache.cassandra.sidecar.common.request.GossipInfoRequest;
 import org.apache.cassandra.sidecar.common.request.ImportSSTableRequest;
 import org.apache.cassandra.sidecar.common.request.ListOperationalJobsRequest;
@@ -334,6 +335,17 @@ public class RequestContext
         public Builder gossipInfoRequest()
         {
             return request(GOSSIP_INFO_REQUEST);
+        }
+
+        /**
+         * Sets the {@code request} to be a {@link GossipHealthRequest} and returns a reference to this Builder enabling
+         * method chaining.
+         *
+         * @return a reference to this Builder
+         */
+        public Builder gossipHealthRequest()
+        {
+            return request(new GossipHealthRequest());
         }
 
         /**

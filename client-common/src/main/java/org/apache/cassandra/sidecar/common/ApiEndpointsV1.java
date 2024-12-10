@@ -97,6 +97,7 @@ public final class ApiEndpointsV1
     public static final String SSTABLE_CLEANUP_ROUTE = API_V1 + PER_UPLOAD;
 
     public static final String GOSSIP_INFO_ROUTE = API_V1 + CASSANDRA + "/gossip";
+    public static final String GOSSIP_HEALTH_ROUTE = GOSSIP_INFO_ROUTE + HEALTH;
     public static final String TIME_SKEW_ROUTE = API_V1 + "/time-skew";
 
     public static final String KEYSPACE_TOKEN_MAPPING_ROUTE = API_V1 + PER_KEYSPACE + "/token-range-replicas";

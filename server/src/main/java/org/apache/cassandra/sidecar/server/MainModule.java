@@ -113,6 +113,7 @@ import org.apache.cassandra.sidecar.routes.CassandraHealthHandler;
 import org.apache.cassandra.sidecar.routes.ConnectedClientStatsHandler;
 import org.apache.cassandra.sidecar.routes.DiskSpaceProtectionHandler;
 import org.apache.cassandra.sidecar.routes.FileStreamHandler;
+import org.apache.cassandra.sidecar.routes.GossipHealthHandler;
 import org.apache.cassandra.sidecar.routes.GossipInfoHandler;
 import org.apache.cassandra.sidecar.routes.JsonErrorHandler;
 import org.apache.cassandra.sidecar.routes.KeyspaceRingHandler;
@@ -319,6 +320,7 @@ public class MainModule extends AbstractModule
                               TokenRangeReplicaMapHandler tokenRangeHandler,
                               LoggerHandler loggerHandler,
                               GossipInfoHandler gossipInfoHandler,
+                              GossipHealthHandler gossipHealthHandler,
                               TimeSkewHandler timeSkewHandler,
                               NodeSettingsHandler nodeSettingsHandler,
                               SSTableUploadHandler ssTableUploadHandler,
@@ -387,6 +389,9 @@ public class MainModule extends AbstractModule
         // authenticated users can also read node settings information.
         router.get(ApiEndpointsV1.NODE_SETTINGS_ROUTE)
               .handler(nodeSettingsHandler);
+
+        router.get(ApiEndpointsV1.GOSSIP_HEALTH_ROUTE)
+              .handler(gossipHealthHandler);
 
         router.get(ApiEndpointsV1.TIME_SKEW_ROUTE)
               .handler(timeSkewHandler);

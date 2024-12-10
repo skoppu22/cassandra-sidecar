@@ -233,4 +233,13 @@ public class CassandraStorageOperations implements StorageOperations
         StorageJmxOperations ssProxy = jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME);
         ssProxy.decommission(force);
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isGossipRunning()
+    {
+        return jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME).isGossipRunning();
+    }
 }

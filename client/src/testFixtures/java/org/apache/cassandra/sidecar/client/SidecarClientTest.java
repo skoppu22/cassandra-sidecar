@@ -392,6 +392,36 @@ abstract class SidecarClientTest
     }
 
     @Test
+    public void testGossipHealthOK() throws InterruptedException, ExecutionException, TimeoutException
+    {
+        SidecarInstanceImpl sidecarInstance = instances.get(3);
+        String gossipHealthAsString = "{\"status\":\"OK\"}";
+        MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(gossipHealthAsString);
+        enqueue(response);
+
+        HealthResponse result = client.gossipHealth(sidecarInstance).get(30, TimeUnit.SECONDS);
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo("OK");
+
+        validateResponseServed(ApiEndpointsV1.GOSSIP_HEALTH_ROUTE);
+    }
+
+    @Test
+    public void testGossipHealthNotOK() throws InterruptedException, ExecutionException, TimeoutException
+    {
+        SidecarInstanceImpl sidecarInstance = instances.get(3);
+        String gossipHealthAsString = "{\"status\":\"NOT_OK\"}";
+        MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(gossipHealthAsString);
+        enqueue(response);
+
+        HealthResponse result = client.gossipHealth(sidecarInstance).get(30, TimeUnit.SECONDS);
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo("NOT_OK");
+
+        validateResponseServed(ApiEndpointsV1.GOSSIP_HEALTH_ROUTE);
+    }
+
+    @Test
     public void testTimeSkew() throws Exception
     {
         String timeSkewAsString = "{\"currentTime\":\"123456789\",\"allowableSkewInMinutes\":\"122\"}}";

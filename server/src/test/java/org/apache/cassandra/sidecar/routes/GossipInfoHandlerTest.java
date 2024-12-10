@@ -19,36 +19,16 @@
 package org.apache.cassandra.sidecar.routes;
 
 import java.util.Collections;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import com.google.inject.AbstractModule;
-import com.google.inject.Guice;
-import com.google.inject.Injector;
-import com.google.inject.Module;
-import com.google.inject.Provides;
-import com.google.inject.Singleton;
-import com.google.inject.util.Modules;
-import io.vertx.core.Vertx;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.predicate.ResponsePredicate;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
-import org.apache.cassandra.sidecar.TestModule;
-import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
-import org.apache.cassandra.sidecar.cluster.InstancesMetadata;
-import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.common.response.GossipInfoResponse;
 import org.apache.cassandra.sidecar.common.server.ClusterMembershipOperations;
-import org.apache.cassandra.sidecar.server.MainModule;
-import org.apache.cassandra.sidecar.server.Server;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,43 +39,16 @@ import static org.mockito.Mockito.when;
  * Tests for the {@link GossipInfoHandler}
  */
 @ExtendWith(VertxExtension.class)
-public class GossipInfoHandlerTest
+public class GossipInfoHandlerTest extends CommonTest
 {
-    static final Logger LOGGER = LoggerFactory.getLogger(GossipInfoHandlerTest.class);
-    Vertx vertx;
-    Server server;
-
-    @BeforeEach
-    void before() throws InterruptedException
-    {
-        Injector injector;
-        Module testOverride = Modules.override(new TestModule())
-                                     .with(new GossipInfoHandlerTestModule());
-        injector = Guice.createInjector(Modules.override(new MainModule())
-                                               .with(testOverride));
-        vertx = injector.getInstance(Vertx.class);
-        server = injector.getInstance(Server.class);
-        VertxTestContext context = new VertxTestContext();
-        server.start()
-              .onSuccess(s -> context.completeNow())
-              .onFailure(context::failNow);
-        context.awaitCompletion(5, TimeUnit.SECONDS);
-    }
-
-    @AfterEach
-    void after() throws InterruptedException
-    {
-        CountDownLatch closeLatch = new CountDownLatch(1);
-        server.close().onSuccess(res -> closeLatch.countDown());
-        if (closeLatch.await(60, TimeUnit.SECONDS))
-            LOGGER.info("Close event received before timeout.");
-        else
-            LOGGER.error("Close event timed out.");
-    }
+    ClusterMembershipOperations ops = mock(ClusterMembershipOperations.class);
 
     @Test
     void testGetGossipInfo(VertxTestContext context)
     {
+        when(ops.gossipInfo()).thenReturn(SAMPLE_GOSSIP_INFO);
+        when(delegate.clusterMembershipOperations()).thenReturn(ops);
+
         WebClient client = WebClient.create(vertx);
         String testRoute = "/api/v1/cassandra/gossip";
         client.get(server.actualPort(), "127.0.0.1", testRoute)
@@ -116,34 +69,6 @@ public class GossipInfoHandlerTest
                   assertThat(gossipInfo.tokens()).isEqualTo("<hidden>");
                   context.completeNow();
               }));
-    }
-
-    static class GossipInfoHandlerTestModule extends AbstractModule
-    {
-        @Provides
-        @Singleton
-        public InstancesMetadata instanceConfig()
-        {
-            final int instanceId = 100;
-            final String host = "127.0.0.1";
-            final InstanceMetadata instanceMetadata = mock(InstanceMetadata.class);
-            when(instanceMetadata.host()).thenReturn(host);
-            when(instanceMetadata.port()).thenReturn(9042);
-            when(instanceMetadata.id()).thenReturn(instanceId);
-            when(instanceMetadata.stagingDir()).thenReturn("");
-            CassandraAdapterDelegate delegate = mock(CassandraAdapterDelegate.class);
-            ClusterMembershipOperations ops = mock(ClusterMembershipOperations.class);
-            when(ops.gossipInfo()).thenReturn(SAMPLE_GOSSIP_INFO);
-            when(delegate.clusterMembershipOperations()).thenReturn(ops);
-            when(instanceMetadata.delegate()).thenReturn(delegate);
-
-            InstancesMetadata mockInstancesMetadata = mock(InstancesMetadata.class);
-            when(mockInstancesMetadata.instances()).thenReturn(Collections.singletonList(instanceMetadata));
-            when(mockInstancesMetadata.instanceFromId(instanceId)).thenReturn(instanceMetadata);
-            when(mockInstancesMetadata.instanceFromHost(host)).thenReturn(instanceMetadata);
-
-            return mockInstancesMetadata;
-        }
     }
 
     private static final String SAMPLE_GOSSIP_INFO =
