@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.cassandra.sidecar.common.response.GossipStatusResponse;
 import org.apache.cassandra.sidecar.common.response.RingResponse;
 import org.apache.cassandra.sidecar.common.response.TokenRangeReplicasResponse;
 import org.apache.cassandra.sidecar.common.server.data.Name;
@@ -102,4 +103,9 @@ public interface StorageOperations
     {
         outOfRangeDataCleanup(keyspace, table, 1);
     }
+
+    /**
+     * @return returns gossip status
+     */
+    GossipStatusResponse isGossipRunning();
 }

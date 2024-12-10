@@ -68,6 +68,7 @@ import org.apache.cassandra.sidecar.common.request.data.MD5Digest;
 import org.apache.cassandra.sidecar.common.request.data.XXHash32Digest;
 import org.apache.cassandra.sidecar.common.response.ConnectedClientStatsResponse;
 import org.apache.cassandra.sidecar.common.response.GossipInfoResponse;
+import org.apache.cassandra.sidecar.common.response.GossipStatusResponse;
 import org.apache.cassandra.sidecar.common.response.HealthResponse;
 import org.apache.cassandra.sidecar.common.response.ListSnapshotFilesResponse;
 import org.apache.cassandra.sidecar.common.response.NodeSettings;
@@ -381,6 +382,20 @@ abstract class SidecarClientTest
         assertThat(gossipInfo.sstableVersions()).isEqualTo(Collections.singletonList("big-nb"));
 
         validateResponseServed(ApiEndpointsV1.GOSSIP_INFO_ROUTE);
+    }
+
+    @Test
+    public void gossipStatus() throws InterruptedException, ExecutionException, TimeoutException
+    {
+        String gossipStatusAsString = "{\"gossipRunning\":\"true\"}";
+        MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(gossipStatusAsString);
+        enqueue(response);
+
+        GossipStatusResponse result = client.gossipStatus().get(30, TimeUnit.SECONDS);
+        assertThat(result).isNotNull();
+        assertThat(result.gossipRunning()).isTrue();
+
+        validateResponseServed(ApiEndpointsV1.GOSSIP_STATUS_ROUTE);
     }
 
     @Test

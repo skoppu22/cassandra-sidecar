@@ -50,6 +50,7 @@ import org.apache.cassandra.sidecar.common.request.data.RestoreJobProgressReques
 import org.apache.cassandra.sidecar.common.request.data.UpdateRestoreJobRequestPayload;
 import org.apache.cassandra.sidecar.common.response.ConnectedClientStatsResponse;
 import org.apache.cassandra.sidecar.common.response.GossipInfoResponse;
+import org.apache.cassandra.sidecar.common.response.GossipStatusResponse;
 import org.apache.cassandra.sidecar.common.response.HealthResponse;
 import org.apache.cassandra.sidecar.common.response.ListSnapshotFilesResponse;
 import org.apache.cassandra.sidecar.common.response.NodeSettings;
@@ -213,6 +214,16 @@ public class SidecarClient implements AutoCloseable, SidecarClientBlobRestoreExt
     public CompletableFuture<GossipInfoResponse> gossipInfo()
     {
         return executor.executeRequestAsync(requestBuilder().gossipInfoRequest().build());
+    }
+
+    /**
+     * Executes the GET gossip status request using the default retry policy and configured selection policy
+     *
+     * @return a completable future with gossip status response
+     */
+    public CompletableFuture<GossipStatusResponse> gossipStatus()
+    {
+        return executor.executeRequestAsync(requestBuilder().gossipStatusRequest().build());
     }
 
     /**
