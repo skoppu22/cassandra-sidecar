@@ -1444,14 +1444,27 @@ abstract class SidecarClientTest
     @Test
     public void testGetPreemptiveOpenInterval() throws Exception
     {
-        String responseAsString = "{\"SSTablePreemptiveOpenIntervalInMB\":30}";
+        String responseAsString = "{\"SSTablePreemptiveOpenInterval\":30}";
 
         MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(responseAsString);
         enqueue(response);
         GetPreemptiveOpenIntervalResponse result = client.getPreemptiveOpenInterval().get();
 
         assertThat(result).isNotNull();
-        assertThat(result.sstablePreemptiveOpenIntervalInMB()).isNotNull().isEqualTo(30);
+        assertThat(result.sstablePreemptiveOpenInterval()).isNotNull().isEqualTo(30);
+    }
+
+    @Test
+    public void testGetPreemptiveOpenIntervalWithUnit() throws Exception
+    {
+        String responseAsString = "{\"SSTablePreemptiveOpenInterval\":40}";
+
+        MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(responseAsString);
+        enqueue(response);
+        GetPreemptiveOpenIntervalResponse result = client.getPreemptiveOpenInterval("MiB").get();
+
+        assertThat(result).isNotNull();
+        assertThat(result.sstablePreemptiveOpenInterval()).isNotNull().isEqualTo(40);
     }
 
     private void enqueue(MockResponse response)

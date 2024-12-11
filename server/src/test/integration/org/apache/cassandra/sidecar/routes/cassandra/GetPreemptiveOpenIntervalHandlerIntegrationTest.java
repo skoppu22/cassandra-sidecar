@@ -29,6 +29,7 @@ import io.vertx.junit5.VertxTestContext;
 import org.apache.cassandra.sidecar.testing.IntegrationTestBase;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 
+import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -72,12 +73,33 @@ public class GetPreemptiveOpenIntervalHandlerIntegrationTest extends Integration
               .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, -1)));
     }
 
+    @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=80")
+    void testPreemptiveOpenIntervalWithUnit(VertxTestContext testContext)
+    {
+        client.get(server.actualPort(), "127.0.0.1", testRoute + "?unit=MiB")
+              .expect(ResponsePredicate.SC_OK)
+              .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, 80)));
+    }
+
+    @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=90")
+    void testPreemptiveOpenIntervalInvalidUnit(VertxTestContext testContext)
+    {
+        client.get(server.actualPort(), "127.0.0.1", testRoute + "?unit=KiB")
+              .expect(ResponsePredicate.SC_BAD_REQUEST)
+              .send(testContext.succeeding(response -> testContext.verify(() -> {
+                  assertThat(response.statusCode()).isEqualTo(BAD_REQUEST.code());
+                  assertThat(response.bodyAsJsonObject().getString("message"))
+                  .isEqualTo("Invalid value provided for unit KiB, expected MiB");
+                  testContext.completeNow();
+              })));
+    }
+
     void verifyValidResponse(VertxTestContext testContext, HttpResponse<Buffer> response, int expectedValue)
     {
         testContext.verify(() -> {
             JsonObject responseJson = response.bodyAsJsonObject();
             assertThat(response.statusCode()).isEqualTo(OK.code());
-            assertThat(responseJson.getInteger("SSTablePreemptiveOpenIntervalInMB"))
+            assertThat(responseJson.getInteger("SSTablePreemptiveOpenInterval"))
             .isEqualTo(expectedValue);
             testContext.completeNow();
         });

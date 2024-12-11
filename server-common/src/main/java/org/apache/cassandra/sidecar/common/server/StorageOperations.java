@@ -105,7 +105,8 @@ public interface StorageOperations
     }
 
     /**
+     * @param unit preemptive open interval value unit, only allowed value is "MiB"
      * @return sstable's preemptive open interval value
      */
-    GetPreemptiveOpenIntervalResponse getSSTablePreemptiveOpenIntervalInMB();
+    GetPreemptiveOpenIntervalResponse getSSTablePreemptiveOpenInterval(DataStorageUnit unit);
 }

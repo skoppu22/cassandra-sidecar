@@ -105,7 +105,7 @@ import org.apache.cassandra.sidecar.routes.SchemaHandler;
 import org.apache.cassandra.sidecar.routes.StreamSSTableComponentHandler;
 import org.apache.cassandra.sidecar.routes.TimeSkewHandler;
 import org.apache.cassandra.sidecar.routes.TokenRangeReplicaMapHandler;
-import org.apache.cassandra.sidecar.routes.cassandra.GetPreemptiveOpenIntervalHandler;
+import org.apache.cassandra.sidecar.routes.GetPreemptiveOpenIntervalHandler;
 import org.apache.cassandra.sidecar.routes.cassandra.NodeSettingsHandler;
 import org.apache.cassandra.sidecar.routes.cdc.ListCdcDirHandler;
 import org.apache.cassandra.sidecar.routes.cdc.StreamCdcSegmentHandler;

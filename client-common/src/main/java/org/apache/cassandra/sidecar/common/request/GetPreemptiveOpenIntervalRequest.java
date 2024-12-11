@@ -36,6 +36,15 @@ public class GetPreemptiveOpenIntervalRequest extends JsonRequest<GetPreemptiveO
     }
 
     /**
+     * Constructs a request to GET preemptive open interval value with query param 'unit'
+     * @param unit query param, data storage units of preemptive open interval value
+     */
+    public GetPreemptiveOpenIntervalRequest(String unit)
+    {
+        super(ApiEndpointsV1.SSTABLE_PREEMPTIVE_OPEN_INTERVAL_ROUTE + "?unit=" + unit);
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override

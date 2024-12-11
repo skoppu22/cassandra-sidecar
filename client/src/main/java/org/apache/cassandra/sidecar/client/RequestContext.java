@@ -498,6 +498,18 @@ public class RequestContext
         }
 
         /**
+         * Sets the {@code request} to be a {@link GetPreemptiveOpenIntervalRequest} with query param 'unit' and
+         * returns a reference to this builder enabling method chaining
+         * @param unit query param, data storage units of preemptive open interval value
+         * @return a reference to this builder
+         */
+        public Builder getPreemptiveOpenIntervalRequest(String unit)
+        {
+            return request(new GetPreemptiveOpenIntervalRequest(unit));
+        }
+
+
+        /**
          * Sets the {@code retryPolicy} to be an
          * {@link org.apache.cassandra.sidecar.client.retry.ExponentialBackoffRetryPolicy} configured with
          * {@code 10} {@code maxRetries}, {@code 500} {@code retryDelayMillis}, and {@code 60,000}

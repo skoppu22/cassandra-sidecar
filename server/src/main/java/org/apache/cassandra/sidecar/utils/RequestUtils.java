@@ -61,4 +61,14 @@ public class RequestUtils
         }
         return defaultValue;
     }
+
+    public static String parseStringQueryParam(HttpServerRequest request, String paramName, String defaultValue)
+    {
+        String value = request.getParam(paramName);
+        if (value != null)
+        {
+            return value;
+        }
+        return defaultValue;
+    }
 }

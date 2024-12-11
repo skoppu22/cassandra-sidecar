@@ -20,6 +20,7 @@ package org.apache.cassandra.sidecar.adapters.base;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
+import java.security.InvalidParameterException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -32,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.cassandra.sidecar.common.response.GetPreemptiveOpenIntervalResponse;
 import org.apache.cassandra.sidecar.common.response.RingResponse;
 import org.apache.cassandra.sidecar.common.response.TokenRangeReplicasResponse;
+import org.apache.cassandra.sidecar.common.server.DataStorageUnit;
 import org.apache.cassandra.sidecar.common.server.JmxClient;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.common.server.cluster.locator.Partitioners;
@@ -216,9 +218,15 @@ public class CassandraStorageOperations implements StorageOperations
     }
 
     @Override
-    public GetPreemptiveOpenIntervalResponse getSSTablePreemptiveOpenIntervalInMB()
+    public GetPreemptiveOpenIntervalResponse getSSTablePreemptiveOpenInterval(DataStorageUnit unit)
     {
-        int preemptiveOpenInterval = jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME).getSSTablePreemptiveOpenIntervalInMB();
+        if (unit != DataStorageUnit.MEBIBYTES)
+        {
+            throw new InvalidParameterException("Unsupported data storage unit: " + unit);
+        }
+
+        int preemptiveOpenInterval = jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME)
+                                              .getSSTablePreemptiveOpenIntervalInMB();
         return new GetPreemptiveOpenIntervalResponse(preemptiveOpenInterval);
     }
 }

@@ -27,20 +27,20 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class GetPreemptiveOpenIntervalResponse
 {
+    private final int sstablePreemptiveOpenInterval;
+
     /**
      * Constructs a response with preemptive open interval value
-     * @param sstablePreemptiveOpenIntervalInMB value of preemptive open interval
+     * @param sstablePreemptiveOpenInterval value of preemptive open interval
      */
-    public GetPreemptiveOpenIntervalResponse(@JsonProperty("SSTablePreemptiveOpenIntervalInMB") int sstablePreemptiveOpenIntervalInMB)
+    public GetPreemptiveOpenIntervalResponse(@JsonProperty("SSTablePreemptiveOpenInterval") int sstablePreemptiveOpenInterval)
     {
-        this.sstablePreemptiveOpenIntervalInMB = sstablePreemptiveOpenIntervalInMB;
+        this.sstablePreemptiveOpenInterval = sstablePreemptiveOpenInterval;
     }
 
-    @JsonProperty("SSTablePreemptiveOpenIntervalInMB")
-    public int sstablePreemptiveOpenIntervalInMB()
+    @JsonProperty("SSTablePreemptiveOpenInterval")
+    public int sstablePreemptiveOpenInterval()
     {
-        return sstablePreemptiveOpenIntervalInMB;
+        return sstablePreemptiveOpenInterval;
     }
-
-    private final int sstablePreemptiveOpenIntervalInMB;
 }

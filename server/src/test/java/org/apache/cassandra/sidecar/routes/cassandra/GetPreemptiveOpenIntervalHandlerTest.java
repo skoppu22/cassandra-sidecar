@@ -29,7 +29,9 @@ import io.vertx.ext.web.client.predicate.ResponsePredicate;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
 import org.apache.cassandra.sidecar.common.response.GetPreemptiveOpenIntervalResponse;
+import org.apache.cassandra.sidecar.common.server.DataStorageUnit;
 
+import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
@@ -45,35 +47,81 @@ class GetPreemptiveOpenIntervalHandlerTest extends JmxCommonTest
     @Test
     void testWithoutInstanceId(VertxTestContext context)
     {
-        when(storageOperations.getSSTablePreemptiveOpenIntervalInMB())
+        when(storageOperations.getSSTablePreemptiveOpenInterval(DataStorageUnit.MEBIBYTES))
         .thenReturn(new GetPreemptiveOpenIntervalResponse(20));
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
-              .send(context.succeeding(response -> verifyResponse(context,
-                                                                  response,
-                                                                  "20")));
+              .send(context.succeeding(response -> verifyValidResponse(context,
+                                                                       response,
+                                                                       "20")));
     }
 
     @Test
     void testWithInstanceId(VertxTestContext context)
     {
-        when(storageOperations.getSSTablePreemptiveOpenIntervalInMB())
+        when(storageOperations.getSSTablePreemptiveOpenInterval(DataStorageUnit.MEBIBYTES))
         .thenReturn(new GetPreemptiveOpenIntervalResponse(10));
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute + "?instanceId=200")
               .expect(ResponsePredicate.SC_OK)
-              .send(context.succeeding(response -> verifyResponse(context,
-                                                                  response,
-                                                                  "10")));
+              .send(context.succeeding(response -> verifyValidResponse(context,
+                                                                       response,
+                                                                       "10")));
+    }
+
+    @Test
+    void testWithUnitParam(VertxTestContext context)
+    {
+        when(storageOperations.getSSTablePreemptiveOpenInterval(DataStorageUnit.MEBIBYTES))
+        .thenReturn(new GetPreemptiveOpenIntervalResponse(30));
+
+        WebClient client = WebClient.create(vertx);
+        client.get(server.actualPort(), "127.0.0.1", testRoute + "?unit=MiB")
+              .expect(ResponsePredicate.SC_OK)
+              .send(context.succeeding(response -> verifyValidResponse(context,
+                                                                       response,
+                                                                       "30")));
+    }
+
+    @Test
+    void testWithUnsupportedUnitParam(VertxTestContext context)
+    {
+        when(storageOperations.getSSTablePreemptiveOpenInterval(DataStorageUnit.GIBIBYTES))
+        .thenReturn(new GetPreemptiveOpenIntervalResponse(40));
+
+        WebClient client = WebClient.create(vertx);
+        client.get(server.actualPort(), "127.0.0.1", testRoute + "?unit=GiB")
+              .expect(ResponsePredicate.SC_BAD_REQUEST)
+              .send(context.succeeding(response -> context.verify(() -> {
+                  assertThat(response.statusCode()).isEqualTo(BAD_REQUEST.code());
+                  assertThat(response.bodyAsJsonObject().getString("message"))
+                  .isEqualTo("Invalid value provided for unit GiB, expected MiB");
+                  context.completeNow();
+              })));
+    }
+
+    @Test
+    void testWithUnitAndInstanceParam(VertxTestContext context)
+    {
+        when(storageOperations.getSSTablePreemptiveOpenInterval(DataStorageUnit.MEBIBYTES))
+        .thenReturn(new GetPreemptiveOpenIntervalResponse(50));
+
+        WebClient client = WebClient.create(vertx);
+        client.get(server.actualPort(), "127.0.0.1", testRoute + "?unit=MiB&instanceId=200")
+              .expect(ResponsePredicate.SC_OK)
+              .send(context.succeeding(response -> verifyValidResponse(context,
+                                                                       response,
+                                                                       "50")));
     }
 
     @Test
     void testFailure(VertxTestContext context)
     {
-        doThrow(new RuntimeException()).when(storageOperations).getSSTablePreemptiveOpenIntervalInMB();
+        doThrow(new RuntimeException()).when(storageOperations)
+                                       .getSSTablePreemptiveOpenInterval(DataStorageUnit.MEBIBYTES);
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute)
@@ -98,12 +146,12 @@ class GetPreemptiveOpenIntervalHandlerTest extends JmxCommonTest
               }));
     }
 
-    private void verifyResponse(VertxTestContext context, HttpResponse<Buffer> response, String expectedValue)
+    private void verifyValidResponse(VertxTestContext context, HttpResponse<Buffer> response, String expectedValue)
     {
         context.verify(() -> {
             JsonObject responseJson = response.bodyAsJsonObject();
             assertThat(response.statusCode()).isEqualTo(OK.code());
-            assertThat(responseJson.getString("SSTablePreemptiveOpenIntervalInMB")).isEqualTo(expectedValue);
+            assertThat(responseJson.getString("SSTablePreemptiveOpenInterval")).isEqualTo(expectedValue);
             context.completeNow();
         });
     }

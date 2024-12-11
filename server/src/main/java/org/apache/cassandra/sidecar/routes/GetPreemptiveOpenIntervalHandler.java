@@ -16,41 +16,52 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.sidecar.routes.cassandra;
+package org.apache.cassandra.sidecar.routes;
 
 import javax.inject.Singleton;
 
 import com.google.inject.Inject;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
+import org.apache.cassandra.sidecar.common.server.DataStorageUnit;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
-import org.apache.cassandra.sidecar.metrics.SidecarMetrics;
-import org.apache.cassandra.sidecar.routes.AbstractHandler;
 import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
+import org.apache.cassandra.sidecar.utils.RequestUtils;
+
+import static org.apache.cassandra.sidecar.utils.HttpExceptions.wrapHttpException;
 
 /**
  * Functionality to retrieve sstable's preemptive open interval value
+ * unit is an optional param, only supported value is "MiB" defaults to the same if not provided
  */
 @Singleton
-public class GetPreemptiveOpenIntervalHandler extends AbstractHandler<Void>
+public class GetPreemptiveOpenIntervalHandler extends AbstractHandler<DataStorageUnit>
 {
-
     @Inject
     protected GetPreemptiveOpenIntervalHandler(InstanceMetadataFetcher metadataFetcher,
                                                ExecutorPools executorPools,
-                                               CassandraInputValidator validator,
-                                               SidecarMetrics sidecarMetrics)
+                                               CassandraInputValidator validator)
     {
         super(metadataFetcher, executorPools, validator);
     }
 
     @Override
-    protected Void extractParamsOrThrow(RoutingContext context)
+    protected DataStorageUnit extractParamsOrThrow(RoutingContext context)
     {
-        return null;
+        // Only supported unit for preemptive open interval value is MB
+        String unit = RequestUtils.parseStringQueryParam(context.request(), "unit", "MiB");
+        if (!unit.equals(DataStorageUnit.MEBIBYTES.getValue()))
+        {
+            throw wrapHttpException(HttpResponseStatus.BAD_REQUEST,
+                                    String.format("Invalid value provided for unit %s, expected %s",
+                                                  unit, DataStorageUnit.MEBIBYTES.getValue()));
+        }
+
+        return DataStorageUnit.MEBIBYTES;
     }
 
     @Override
@@ -58,15 +69,15 @@ public class GetPreemptiveOpenIntervalHandler extends AbstractHandler<Void>
                                   HttpServerRequest httpRequest,
                                   String host,
                                   SocketAddress remoteAddress,
-                                  Void request)
+                                  DataStorageUnit unit)
     {
         StorageOperations storageOperations = getStorageOperations(host);
-        logger.debug("Retrieving SSTable's preemptiveOpenInterval, remoteAddress={}, instance={}",
-                     remoteAddress, host);
+        logger.debug("Retrieving SSTable's preemptiveOpenInterval, unit={}, remoteAddress={}, instance={}",
+                     unit, remoteAddress, host);
 
         executorPools.service()
-                     .executeBlocking(storageOperations::getSSTablePreemptiveOpenIntervalInMB)
+                     .executeBlocking(() -> storageOperations.getSSTablePreemptiveOpenInterval(unit))
                      .onSuccess(context::json)
-                     .onFailure(cause -> processFailure(cause, context, host, remoteAddress, request));
+                     .onFailure(cause -> processFailure(cause, context, host, remoteAddress, unit));
     }
 }
