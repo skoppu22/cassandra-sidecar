@@ -90,6 +90,19 @@ public interface ServiceConfiguration
     int serverVerticleInstances();
 
     /**
+     * TODO: move operationalJob related configuration to its own class, when the number of configurable fields grows in the future
+     * @return the size of the operational job tracker LRU cache
+     */
+    int operationalJobTrackerSize();
+
+    /**
+     * @return the max wait time in milliseconds for operational job to run internally before returning the http response;
+     *         if the job finishes before the max wait time, it returns immediately on completion;
+     *         otherwise, a response indicating the job is still running is returned after the max wait time.
+     */
+    long operationalJobExecutionMaxWaitTimeInMillis();
+
+    /**
      * @return the throttling configuration
      */
     ThrottleConfiguration throttleConfiguration();

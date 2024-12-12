@@ -99,6 +99,8 @@ import org.apache.cassandra.sidecar.routes.DiskSpaceProtectionHandler;
 import org.apache.cassandra.sidecar.routes.FileStreamHandler;
 import org.apache.cassandra.sidecar.routes.GossipInfoHandler;
 import org.apache.cassandra.sidecar.routes.JsonErrorHandler;
+import org.apache.cassandra.sidecar.routes.ListOperationalJobsHandler;
+import org.apache.cassandra.sidecar.routes.OperationalJobHandler;
 import org.apache.cassandra.sidecar.routes.RingHandler;
 import org.apache.cassandra.sidecar.routes.RoutingOrder;
 import org.apache.cassandra.sidecar.routes.SchemaHandler;
@@ -269,6 +271,8 @@ public class MainModule extends AbstractModule
                               CreateRestoreSliceHandler createRestoreSliceHandler,
                               RestoreJobProgressHandler restoreJobProgressHandler,
                               ConnectedClientStatsHandler connectedClientStatsHandler,
+                              OperationalJobHandler operationalJobHandler,
+                              ListOperationalJobsHandler listOperationalJobsHandler,
                               ErrorHandler errorHandler)
     {
         Router router = Router.router(vertx);
@@ -361,6 +365,12 @@ public class MainModule extends AbstractModule
 
         router.get(ApiEndpointsV1.CONNECTED_CLIENT_STATS_ROUTE)
               .handler(connectedClientStatsHandler);
+
+        router.get(ApiEndpointsV1.OPERATIONAL_JOB_ROUTE)
+              .handler(operationalJobHandler);
+
+        router.get(ApiEndpointsV1.LIST_OPERATIONAL_JOBS_ROUTE)
+              .handler(listOperationalJobsHandler);
 
         router.get(ApiEndpointsV1.RING_ROUTE_PER_KEYSPACE)
               .handler(ringHandler);
