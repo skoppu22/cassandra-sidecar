@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +46,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -70,6 +72,7 @@ import org.apache.cassandra.sidecar.common.request.data.XXHash32Digest;
 import org.apache.cassandra.sidecar.common.response.ConnectedClientStatsResponse;
 import org.apache.cassandra.sidecar.common.response.GossipInfoResponse;
 import org.apache.cassandra.sidecar.common.response.HealthResponse;
+import org.apache.cassandra.sidecar.common.response.ListCdcSegmentsResponse;
 import org.apache.cassandra.sidecar.common.response.ListOperationalJobsResponse;
 import org.apache.cassandra.sidecar.common.response.ListSnapshotFilesResponse;
 import org.apache.cassandra.sidecar.common.response.NodeSettings;
@@ -79,6 +82,7 @@ import org.apache.cassandra.sidecar.common.response.SSTableImportResponse;
 import org.apache.cassandra.sidecar.common.response.SchemaResponse;
 import org.apache.cassandra.sidecar.common.response.TimeSkewResponse;
 import org.apache.cassandra.sidecar.common.response.TokenRangeReplicasResponse;
+import org.apache.cassandra.sidecar.common.response.data.CdcSegmentInfo;
 import org.apache.cassandra.sidecar.common.response.data.ClientConnectionEntry;
 import org.apache.cassandra.sidecar.common.response.data.CreateRestoreJobResponsePayload;
 import org.apache.cassandra.sidecar.common.response.data.RingEntry;
@@ -1497,6 +1501,76 @@ abstract class SidecarClientTest
             assertThat(entry.clientOptions()).containsKeys("CQL_VERSION", "DRIVER_NAME", "DRIVER_VERSION");
             validateResponseServed(server, ApiEndpointsV1.CONNECTED_CLIENT_STATS_ROUTE, req -> { });
         }
+    }
+
+    @Test
+    public void testListCdcSegments() throws ExecutionException, InterruptedException, JsonProcessingException
+    {
+        List<CdcSegmentInfo> segments = Arrays.asList(new CdcSegmentInfo("commit-log1", 100, 100, true, 1732148713725L),
+                new CdcSegmentInfo("commit-log2", 100, 10, false, 1732148713725L));
+        ListCdcSegmentsResponse listSegmentsResponse = new ListCdcSegmentsResponse("localhost", 9043, segments);
+        ObjectMapper mapper = new ObjectMapper();
+
+        MockResponse response = new MockResponse();
+        response.setResponseCode(200);
+        response.setHeader("content-type", "application/json");
+        response.setBody(mapper.writeValueAsString(listSegmentsResponse));
+        enqueue(response);
+
+        SidecarInstance instance = instances.get(0);
+        ListCdcSegmentsResponse result = client.listCdcSegments(instance).get();
+        assertThat(result).isNotNull();
+        assertThat(result).isEqualTo(listSegmentsResponse);
+        validateResponseServed(ApiEndpointsV1.LIST_CDC_SEGMENTS_ROUTE);
+    }
+
+    @Test
+    public void testStreamCdcSegments() throws InterruptedException
+    {
+        MockResponse response = new MockResponse();
+        // mock reading the first 12 bytes, i.e. "Test Content" from a large blob (1024).
+        response.setResponseCode(200)
+                .setHeader(HttpHeaderNames.CONTENT_TYPE.toString(),
+                           HttpHeaderValues.APPLICATION_OCTET_STREAM)
+                .setHeader(HttpHeaderNames.ACCEPT_RANGES.toString(), "bytes")
+                .setHeader(HttpHeaderNames.CONTENT_RANGE.toString(), "bytes 0-11/1024")
+                .setBody("Test Content");
+        enqueue(response);
+
+        SidecarInstance instance = instances.get(0);
+        CountDownLatch latch = new CountDownLatch(1);
+        List<byte[]> receivedBytes = new ArrayList<>();
+        StreamConsumer mockStreamConsumer = new StreamConsumer()
+        {
+            @Override
+            public void onRead(StreamBuffer buffer)
+            {
+                assertThat(buffer.readableBytes()).isGreaterThan(0);
+                byte[] dst = new byte[buffer.readableBytes()];
+                buffer.copyBytes(0, dst, 0, buffer.readableBytes());
+                receivedBytes.add(dst);
+            }
+
+            @Override
+            public void onComplete()
+            {
+                latch.countDown();
+            }
+
+            @Override
+            public void onError(Throwable throwable)
+            {
+                latch.countDown();
+            }
+        };
+        client.streamCdcSegments(instance, "testSegment", HttpRange.of(0, 11), mockStreamConsumer);
+        latch.await();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        for (byte[] bytes : receivedBytes)
+        {
+            baos.write(bytes, 0, bytes.length);
+        }
+        assertThat(new String(baos.toByteArray(), StandardCharsets.UTF_8)).isEqualTo("Test Content");
     }
 
     private void enqueue(MockResponse response)

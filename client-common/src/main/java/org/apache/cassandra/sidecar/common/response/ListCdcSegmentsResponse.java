@@ -20,6 +20,7 @@ package org.apache.cassandra.sidecar.common.response;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -64,5 +65,26 @@ public class ListCdcSegmentsResponse
     public List<CdcSegmentInfo> segmentInfos()
     {
         return segmentInfos;
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass())
+        {
+            return false;
+        }
+        ListCdcSegmentsResponse that = (ListCdcSegmentsResponse) o;
+        return port == that.port && Objects.equals(host, that.host) && Objects.equals(segmentInfos, that.segmentInfos);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(host, port, segmentInfos);
     }
 }

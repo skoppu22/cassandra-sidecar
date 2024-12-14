@@ -39,8 +39,10 @@ import org.apache.cassandra.sidecar.common.request.AbortRestoreJobRequest;
 import org.apache.cassandra.sidecar.common.request.CreateRestoreJobRequest;
 import org.apache.cassandra.sidecar.common.request.CreateRestoreJobSliceRequest;
 import org.apache.cassandra.sidecar.common.request.ImportSSTableRequest;
+import org.apache.cassandra.sidecar.common.request.ListCdcSegmentsRequest;
 import org.apache.cassandra.sidecar.common.request.RestoreJobProgressRequest;
 import org.apache.cassandra.sidecar.common.request.RestoreJobSummaryRequest;
+import org.apache.cassandra.sidecar.common.request.StreamCdcSegmentRequest;
 import org.apache.cassandra.sidecar.common.request.UpdateRestoreJobRequest;
 import org.apache.cassandra.sidecar.common.request.data.AbortRestoreJobRequestPayload;
 import org.apache.cassandra.sidecar.common.request.data.CreateRestoreJobRequestPayload;
@@ -51,6 +53,7 @@ import org.apache.cassandra.sidecar.common.request.data.UpdateRestoreJobRequestP
 import org.apache.cassandra.sidecar.common.response.ConnectedClientStatsResponse;
 import org.apache.cassandra.sidecar.common.response.GossipInfoResponse;
 import org.apache.cassandra.sidecar.common.response.HealthResponse;
+import org.apache.cassandra.sidecar.common.response.ListCdcSegmentsResponse;
 import org.apache.cassandra.sidecar.common.response.ListOperationalJobsResponse;
 import org.apache.cassandra.sidecar.common.response.ListSnapshotFilesResponse;
 import org.apache.cassandra.sidecar.common.response.NodeSettings;
@@ -489,6 +492,41 @@ public class SidecarClient implements AutoCloseable, SidecarClientBlobRestoreExt
         return executor.executeRequestAsync(requestBuilder().singleInstanceSelectionPolicy(instance)
                                                             .cleanSSTableUploadSessionRequest(uploadId)
                                                             .build());
+    }
+
+    /**
+     * Lists CDC commit logs in CDC directory for an instance
+     * @param sidecarInstance instance on which the CDC commit logs are to be listed
+     * @return a completable future with List of cdc commitLogs on the requested instance
+     */
+    public CompletableFuture<ListCdcSegmentsResponse> listCdcSegments(SidecarInstance sidecarInstance)
+    {
+        return executor.executeRequestAsync(requestBuilder()
+                       .singleInstanceSelectionPolicy(sidecarInstance)
+                       .request(new ListCdcSegmentsRequest())
+                       .build());
+    }
+
+    /**
+     * Streams CDC commit log segments from the requested instance.
+     *
+     * Streams the specified {@code range} of a CDC CommitLog from the given instance and the
+     * stream is consumed by the {@link StreamConsumer consumer}.
+     *
+     * @param sidecarInstance instance on which the CDC commit logs are to be streamed
+     * @param segment segment file name
+     * @param range range of the file to be streamed
+     * @param streamConsumer object that consumes the stream
+     */
+    public void streamCdcSegments(SidecarInstance sidecarInstance,
+                                  String segment,
+                                  HttpRange range,
+                                  StreamConsumer streamConsumer)
+    {
+        executor.streamRequest(requestBuilder()
+                .singleInstanceSelectionPolicy(sidecarInstance)
+                .request(new StreamCdcSegmentRequest(segment, range))
+                .build(), streamConsumer);
     }
 
     /**
