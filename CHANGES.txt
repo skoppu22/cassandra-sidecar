@@ -1,5 +1,6 @@
 1.0.0
 -----
+ * Adding support for CDC APIs into sidecar client (CASSSIDECAR-172)
  * Stopping Sidecar can take a long time (CASSSIDECAR-178)
  * Add support for operational job management of long-running node operations (CASSSIDECAR-150)
  * CDC directory not initialized properly in InstanceMetadata (CASSSIDECAR-171)
@@ -117,4 +118,3 @@
  * Add support for SSL and bindable address (CASSANDRA-15030)
  * Autogenerate API docs for sidecar (CASSANDRA-15028)
  * C* Management process (CASSANDRA-14395)
- * Adding support for CDC APIs into sidecar client (CASSSIDECAR-172)
