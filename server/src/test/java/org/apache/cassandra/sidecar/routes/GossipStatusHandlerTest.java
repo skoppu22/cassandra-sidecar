@@ -48,7 +48,7 @@ public class GossipStatusHandlerTest extends JmxCommonTest
     @Test
     void testGossipRunning(VertxTestContext context)
     {
-        when(storageOperations.isGossipRunning()).thenReturn(new GossipStatusResponse(true));
+        when(storageOperations.gossipStatus()).thenReturn(new GossipStatusResponse(true));
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute)
@@ -59,7 +59,7 @@ public class GossipStatusHandlerTest extends JmxCommonTest
     @Test
     void testGossipNotRunning(VertxTestContext context)
     {
-        when(storageOperations.isGossipRunning()).thenReturn(new GossipStatusResponse(false));
+        when(storageOperations.gossipStatus()).thenReturn(new GossipStatusResponse(false));
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute)
@@ -70,7 +70,7 @@ public class GossipStatusHandlerTest extends JmxCommonTest
     @Test
     void testWithInstanceId(VertxTestContext context)
     {
-        when(storageOperations.isGossipRunning()).thenReturn(new GossipStatusResponse(true));
+        when(storageOperations.gossipStatus()).thenReturn(new GossipStatusResponse(true));
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute + "?instanceId=200")
@@ -81,7 +81,7 @@ public class GossipStatusHandlerTest extends JmxCommonTest
     @Test
     void testFailure(VertxTestContext context)
     {
-        doThrow(new RuntimeException()).when(storageOperations).isGossipRunning();
+        doThrow(new RuntimeException()).when(storageOperations).gossipStatus();
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute)

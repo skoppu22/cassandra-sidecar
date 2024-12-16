@@ -20,12 +20,11 @@ package org.apache.cassandra.sidecar.routes;
 
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import io.vertx.core.buffer.Buffer;
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.client.HttpResponse;
+import io.vertx.core.Future;
 import io.vertx.ext.web.client.predicate.ResponsePredicate;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
+import org.apache.cassandra.sidecar.common.response.GossipStatusResponse;
 import org.apache.cassandra.sidecar.testing.IntegrationTestBase;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.CassandraTestContext;
@@ -41,36 +40,35 @@ public class GossipStatusHandlerIntegrationTest extends IntegrationTestBase
 {
     private static final String testRoute = "/api/v1/cassandra/gossip/status";
 
+    private Future<GossipStatusResponse> getGossipStatus()
+    {
+        return client.get(server.actualPort(), "127.0.0.1", testRoute)
+                     .expect(ResponsePredicate.SC_OK)
+                     .send()
+                     .compose(response -> {
+                         assertThat(response.statusCode()).isEqualTo(OK.code());
+                         return Future.succeededFuture(response.bodyAsJson(GossipStatusResponse.class));
+                     });
+    }
+
     @CassandraIntegrationTest()
-    void testGossipDisabled(CassandraTestContext context, VertxTestContext testContext)
+    void testGossipStatus(CassandraTestContext context, VertxTestContext testContext)
     {
         int disableGossip = context.cluster().getFirstRunningInstance().nodetool("disablegossip");
         assertThat(disableGossip).isEqualTo(0);
 
-        client.get(server.actualPort(), "127.0.0.1", testRoute)
-              .expect(ResponsePredicate.SC_OK)
-              .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, false)));
-    }
-
-    @CassandraIntegrationTest()
-    void testGossipEnabled(CassandraTestContext context, VertxTestContext testContext)
-    {
-        int enableGossip = context.cluster().getFirstRunningInstance().nodetool("enablegossip");
-        assertThat(enableGossip).isEqualTo(0);
-
-        client.get(server.actualPort(), "127.0.0.1", testRoute)
-              .expect(ResponsePredicate.SC_OK)
-              .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, true)));
-    }
-
-    void verifyValidResponse(VertxTestContext testContext, HttpResponse<Buffer> response, boolean expectedValue)
-    {
-        testContext.verify(() -> {
-            JsonObject responseJson = response.bodyAsJsonObject();
-            assertThat(response.statusCode()).isEqualTo(OK.code());
-            assertThat(responseJson.getBoolean("gossipRunning"))
-            .isEqualTo(expectedValue);
-            testContext.completeNow();
-        });
+        getGossipStatus()
+        .compose(response -> {
+            assertThat(response.gossipRunning()).isEqualTo(false);
+            assertThat(context.cluster().getFirstRunningInstance().nodetool("enablegossip"))
+            .isEqualTo(0);
+            return getGossipStatus();
+        })
+        .compose(response -> {
+            assertThat(response.gossipRunning()).isEqualTo(true);
+            return Future.succeededFuture();
+        })
+        .onSuccess(response -> testContext.completeNow())
+        .onFailure(testContext::failNow);
     }
 }

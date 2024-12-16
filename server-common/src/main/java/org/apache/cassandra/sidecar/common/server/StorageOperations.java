@@ -107,5 +107,5 @@ public interface StorageOperations
     /**
      * @return returns gossip status
      */
-    GossipStatusResponse isGossipRunning();
+    GossipStatusResponse gossipStatus();
 }

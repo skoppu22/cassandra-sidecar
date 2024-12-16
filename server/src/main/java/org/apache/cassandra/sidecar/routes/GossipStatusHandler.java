@@ -22,7 +22,7 @@ import com.google.inject.Inject;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
-import org.apache.cassandra.sidecar.common.server.StorageOperations;
+import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 
@@ -53,14 +53,12 @@ public class GossipStatusHandler extends AbstractHandler<Void>
                                SocketAddress remoteAddress,
                                Void request)
     {
-        StorageOperations storageOperations = getStorageOperations(host);
-        logger.debug("Retrieving gossip status, remoteAddress={}, instance={}",
-                     remoteAddress, host);
-
-        executorPools.service()
-                     .executeBlocking(storageOperations::isGossipRunning)
-                     .onSuccess(context::json)
-                     .onFailure(cause -> processFailure(cause, context, host, remoteAddress, request));
+        ifAvailableFromDelegate(context, host, CassandraAdapterDelegate::storageOperations, storageOperations -> {
+            executorPools.service()
+                         .executeBlocking(storageOperations::gossipStatus)
+                         .onSuccess(context::json)
+                         .onFailure(cause -> processFailure(cause, context, host, remoteAddress, request));
+        });
     }
 
     /**

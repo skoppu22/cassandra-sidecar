@@ -221,9 +221,12 @@ public class SidecarClient implements AutoCloseable, SidecarClientBlobRestoreExt
      *
      * @return a completable future with gossip status response
      */
-    public CompletableFuture<GossipStatusResponse> gossipStatus()
+    public CompletableFuture<GossipStatusResponse> gossipStatus(SidecarInstance instance)
     {
-        return executor.executeRequestAsync(requestBuilder().gossipStatusRequest().build());
+        return executor.executeRequestAsync(requestBuilder()
+                                            .singleInstanceSelectionPolicy(instance)
+                                            .gossipStatusRequest()
+                                            .build());
     }
 
     /**

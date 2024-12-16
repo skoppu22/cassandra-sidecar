@@ -387,11 +387,12 @@ abstract class SidecarClientTest
     @Test
     public void gossipStatus() throws InterruptedException, ExecutionException, TimeoutException
     {
+        SidecarInstanceImpl sidecarInstance = instances.get(3);
         String gossipStatusAsString = "{\"gossipRunning\":\"true\"}";
         MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(gossipStatusAsString);
         enqueue(response);
 
-        GossipStatusResponse result = client.gossipStatus().get(30, TimeUnit.SECONDS);
+        GossipStatusResponse result = client.gossipStatus(sidecarInstance).get(30, TimeUnit.SECONDS);
         assertThat(result).isNotNull();
         assertThat(result.gossipRunning()).isTrue();
 

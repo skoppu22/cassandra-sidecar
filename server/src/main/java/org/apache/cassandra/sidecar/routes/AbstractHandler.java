@@ -20,6 +20,7 @@ package org.apache.cassandra.sidecar.routes;
 
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,8 +35,6 @@ import io.vertx.ext.web.handler.HttpException;
 import org.apache.cassandra.sidecar.adapters.base.exception.OperationUnavailableException;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
-import org.apache.cassandra.sidecar.common.server.MetricsOperations;
-import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.common.server.data.Name;
 import org.apache.cassandra.sidecar.common.server.data.QualifiedTableName;
 import org.apache.cassandra.sidecar.common.server.exceptions.JmxAuthenticationException;
@@ -103,9 +102,10 @@ public abstract class AbstractHandler<T> implements Handler<RoutingContext>
         }
     }
 
-    protected void ifMetricsOpsAvailable(RoutingContext context,
-                                         String host,
-                                         Consumer<MetricsOperations> ifAvailable)
+    protected <P> void ifAvailableFromDelegate(RoutingContext context,
+                                               String host,
+                                               Function<CassandraAdapterDelegate, P> mapper,
+                                               Consumer<P> ifAvailable)
     {
         CassandraAdapterDelegate delegate = metadataFetcher.delegate(host);
         if (delegate == null)
@@ -113,13 +113,13 @@ public abstract class AbstractHandler<T> implements Handler<RoutingContext>
             context.fail(cassandraServiceUnavailable());
             return;
         }
-        MetricsOperations operations = delegate.metricsOperations();
-        if (operations == null)
+        P operation = mapper.apply(delegate);
+        if (operation == null)
         {
             context.fail(cassandraServiceUnavailable());
             return;
         }
-         ifAvailable.accept(operations);
+         ifAvailable.accept(operation);
     }
 
     /**
@@ -331,17 +331,5 @@ public abstract class AbstractHandler<T> implements Handler<RoutingContext>
             return host.startsWith("[") ? host.substring(1, host.length() - 1) : host;
         }
         return address;
-    }
-
-    protected StorageOperations getStorageOperations(String host)
-    {
-        CassandraAdapterDelegate delegate = this.metadataFetcher.delegate(host);
-        StorageOperations storageOperations = delegate == null ? null : delegate.storageOperations();
-        if (storageOperations == null)
-        {
-            throw cassandraServiceUnavailable();
-        }
-
-        return storageOperations;
     }
 }

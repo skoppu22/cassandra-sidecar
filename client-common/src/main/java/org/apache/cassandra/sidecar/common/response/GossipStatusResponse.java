@@ -27,6 +27,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class GossipStatusResponse
 {
+    private final boolean gossipRunning;
+
     /**
      * Constructs a response with gossip status
      * @param gossipRunning running status of gossip
@@ -41,6 +43,4 @@ public class GossipStatusResponse
     {
         return gossipRunning;
     }
-
-    private final boolean gossipRunning;
 }
