@@ -32,6 +32,9 @@ import io.vertx.core.Promise;
 import io.vertx.core.impl.ConcurrentHashSet;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.concurrent.TaskExecutorPool;
+import org.apache.cassandra.sidecar.coordination.ClusterLease;
+import org.apache.cassandra.sidecar.coordination.ExecuteOnClusterLeaseholderOnly;
+import org.jetbrains.annotations.VisibleForTesting;
 
 /**
  * This class manages the scheduling and execution of {@link PeriodicTask}s.
@@ -44,11 +47,19 @@ public class PeriodicTaskExecutor implements Closeable
     private final Map<PeriodicTaskKey, Long> timerIds = new ConcurrentHashMap<>();
     private final Set<PeriodicTaskKey> activeTasks = new ConcurrentHashSet<>();
     private final TaskExecutorPool internalPool;
+    private final ClusterLease clusterLease;
 
-    @Inject
+    @VisibleForTesting
     public PeriodicTaskExecutor(ExecutorPools executorPools)
     {
+        this(executorPools, null);
+    }
+
+    @Inject
+    public PeriodicTaskExecutor(ExecutorPools executorPools, ClusterLease clusterLease)
+    {
         this.internalPool = executorPools.internal();
+        this.clusterLease = clusterLease;
     }
 
     /**
@@ -124,10 +135,27 @@ public class PeriodicTaskExecutor implements Closeable
     private void executeInternal(PeriodicTaskKey key)
     {
         PeriodicTask periodicTask = key.task;
-        if (periodicTask.shouldSkip())
+
+        switch (determineExecution(periodicTask))
         {
-            LOGGER.trace("Skip executing task. task={}", periodicTask.name());
-            return;
+            case SKIP_EXECUTION:
+                LOGGER.trace("Skip executing task. task={}", periodicTask.name());
+                return;
+
+            case EXECUTE:
+                break;
+
+            case INDETERMINATE:
+            default:
+                LOGGER.debug("Unable to determine execution for this task, rescheduling. task={}", periodicTask.name());
+                // When the process is unable to determine whether a task should be executed, we want
+                // the task to be rescheduled for a shorter period of time. Assume you have a PeriodicTask that
+                // runs every day. If it happens to run during a period of time when there's no
+                // determination whether task should run or not, we do not want to wait another day for the
+                // task to run, so instead we reschedule it and only wait the initial delay of the task for
+                // the task to try again.
+                reschedule(periodicTask);
+                return;
         }
 
         if (!activeTasks.add(key))
@@ -149,6 +177,26 @@ public class PeriodicTaskExecutor implements Closeable
         }
 
         promise.future().onComplete(res -> activeTasks.remove(key));
+    }
+
+    /**
+     * Determines whether the task should run.
+     *
+     * @param periodicTask the task
+     * @return the result of the determination
+     */
+    protected ExecutionDetermination determineExecution(PeriodicTask periodicTask)
+    {
+        if (periodicTask.shouldSkip())
+        {
+            return ExecutionDetermination.SKIP_EXECUTION;
+        }
+
+        if (periodicTask instanceof ExecuteOnClusterLeaseholderOnly)
+        {
+            return clusterLease.executionDetermination();
+        }
+        return ExecutionDetermination.EXECUTE;
     }
 
     // A simple wrapper that implements equals and hashcode,

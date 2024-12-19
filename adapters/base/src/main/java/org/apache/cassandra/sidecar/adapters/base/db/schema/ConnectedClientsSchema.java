@@ -41,6 +41,7 @@ public class ConnectedClientsSchema extends CassandraSystemTableSchema
         return KEYSPACE_NAME;
     }
 
+    @Override
     public void prepareStatements(@NotNull Session session)
     {
         statsStatement = prepare(statsStatement, session, statsStatement());
@@ -63,7 +64,7 @@ public class ConnectedClientsSchema extends CassandraSystemTableSchema
         return connectionsByUserStatement;
     }
 
-    private String statsStatement()
+    static String statsStatement()
     {
         return String.format("SELECT * FROM %s.%s;", KEYSPACE_NAME, TABLE_NAME);
     }
