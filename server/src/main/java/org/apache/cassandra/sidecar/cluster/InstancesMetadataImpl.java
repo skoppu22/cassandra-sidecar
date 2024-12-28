@@ -31,21 +31,21 @@ import org.apache.cassandra.sidecar.exceptions.NoSuchSidecarInstanceException;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Local implementation of InstancesConfig.
+ * Local implementation of InstancesMetadata.
  */
-public class InstancesConfigImpl implements InstancesConfig
+public class InstancesMetadataImpl implements InstancesMetadata
 {
     private final Map<Integer, InstanceMetadata> idToInstanceMetadata;
     private final Map<String, InstanceMetadata> hostToInstanceMetadata;
     private final List<InstanceMetadata> instanceMetadataList;
     private final DnsResolver dnsResolver;
 
-    public InstancesConfigImpl(InstanceMetadata instanceMetadata, DnsResolver dnsResolver)
+    public InstancesMetadataImpl(InstanceMetadata instanceMetadata, DnsResolver dnsResolver)
     {
         this(Collections.singletonList(instanceMetadata), dnsResolver);
     }
 
-    public InstancesConfigImpl(List<InstanceMetadata> instanceMetadataList, DnsResolver dnsResolver)
+    public InstancesMetadataImpl(List<InstanceMetadata> instanceMetadataList, DnsResolver dnsResolver)
     {
         this.idToInstanceMetadata = instanceMetadataList.stream()
                                                         .collect(Collectors.toMap(InstanceMetadata::id,
