@@ -20,7 +20,6 @@ package org.apache.cassandra.sidecar.routes;
 
 import org.apache.commons.lang3.StringUtils;
 
-import com.datastax.driver.core.Metadata;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -28,6 +27,7 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
+import org.apache.cassandra.sidecar.common.response.NodeSettings;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.common.server.data.Name;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
@@ -35,7 +35,6 @@ import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.HttpExceptions;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 
-import static org.apache.cassandra.sidecar.utils.HttpExceptions.cassandraServiceUnavailable;
 import static org.apache.cassandra.sidecar.utils.HttpExceptions.wrapHttpException;
 
 /**
@@ -70,22 +69,10 @@ public class TokenRangeReplicaMapHandler extends AbstractHandler<Name>
                                Name keyspace)
     {
         CassandraAdapterDelegate delegate = metadataFetcher.delegate(host);
-        if (delegate == null)
-        {
-            context.fail(cassandraServiceUnavailable());
-            return;
-        }
-
+        NodeSettings nodeSettings = delegate.nodeSettings();
         StorageOperations operations = delegate.storageOperations();
-        Metadata metadata = delegate.metadata();
-        if (operations == null || metadata == null)
-        {
-            context.fail(cassandraServiceUnavailable());
-            return;
-        }
-
         executorPools.service()
-                     .executeBlocking(() -> operations.tokenRangeReplicas(keyspace, metadata.getPartitioner()))
+                     .executeBlocking(() -> operations.tokenRangeReplicas(keyspace, nodeSettings.partitioner()))
                      .onSuccess(context::json)
                      .onFailure(cause -> processFailure(cause, context, host, remoteAddress, keyspace));
     }

@@ -22,6 +22,7 @@ import com.google.inject.Inject;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
+import org.apache.cassandra.sidecar.common.server.MetricsOperations;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 
@@ -30,7 +31,7 @@ import static org.apache.cassandra.sidecar.utils.RequestUtils.parseBooleanQueryP
 /**
  * Handler for retrieving stats for connected clients
  */
-public class ConnectedClientStatsHandler extends AbstractHandler<Void>
+public class ConnectedClientStatsHandler extends AbstractHandler<Boolean>
 {
     /**
      * Constructs a handler with the provided {@code metadataFetcher}
@@ -52,21 +53,17 @@ public class ConnectedClientStatsHandler extends AbstractHandler<Void>
                                HttpServerRequest httpRequest,
                                String host,
                                SocketAddress remoteAddress,
-                               Void request)
+                               Boolean summaryOnly)
     {
-
-        ifMetricsOpsAvailable(context, host, operations -> {
-            boolean summaryOnly = parseBooleanQueryParam(httpRequest, "summary", true);
-
-            executorPools.service()
-                         .executeBlocking(() -> operations.connectedClientStats(summaryOnly))
-                         .onSuccess(context::json)
-                         .onFailure(cause -> processFailure(cause, context, host, remoteAddress, request));
-        });
+        MetricsOperations operations = metadataFetcher.delegate(host).metricsOperations();
+        executorPools.service()
+                     .executeBlocking(() -> operations.connectedClientStats(summaryOnly))
+                     .onSuccess(context::json)
+                     .onFailure(cause -> processFailure(cause, context, host, remoteAddress, summaryOnly));
     }
 
-    protected Void extractParamsOrThrow(RoutingContext context)
+    protected Boolean extractParamsOrThrow(RoutingContext context)
     {
-        return null;
+        return parseBooleanQueryParam(context.request(), "summary", true);
     }
 }

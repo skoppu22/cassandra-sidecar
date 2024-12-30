@@ -42,10 +42,12 @@ import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.config.ServiceConfiguration;
 import org.apache.cassandra.sidecar.config.yaml.SSTableImportConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.TestServiceConfiguration;
+import org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException;
 import org.apache.cassandra.sidecar.metrics.instance.InstanceMetrics;
 import org.apache.cassandra.sidecar.metrics.instance.InstanceMetricsImpl;
 
 import static org.apache.cassandra.sidecar.AssertionUtils.loopAssert;
+import static org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException.Service.CQL_AND_JMX;
 import static org.apache.cassandra.sidecar.utils.TestMetricUtils.registry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -107,6 +109,7 @@ class SSTableImporterTest
         when(mockTableOperations2.importNewSSTables("ks", "tbl", "/dir", true, true,
                                                     true, true, true, true, false))
         .thenThrow(new RuntimeException("Exception during import"));
+        when(mockCassandraAdapterDelegate3.tableOperations()).thenThrow(new CassandraUnavailableException(CQL_AND_JMX, "Cassandra unavailable"));
         executorPools = new ExecutorPools(vertx, serviceConfiguration);
         mockUploadPathBuilder = mock(SSTableUploadsPathBuilder.class);
 
@@ -180,10 +183,9 @@ class SSTableImporterTest
         });
 
         importFuture.onComplete(context.failing(p -> {
-            assertThat(p).isInstanceOf(HttpException.class);
-            HttpException exception = (HttpException) p;
-            assertThat(exception.getStatusCode()).isEqualTo(HttpResponseStatus.SERVICE_UNAVAILABLE.code());
-            assertThat(exception.getPayload()).isEqualTo("Cassandra service is unavailable");
+            assertThat(p).isInstanceOf(CassandraUnavailableException.class);
+            CassandraUnavailableException exception = (CassandraUnavailableException) p;
+            assertThat(exception.getMessage()).isEqualTo("Cassandra CQL_AND_JMX service is unavailable. Cassandra unavailable");
 
             assertThat(importer.importQueuePerHost).isNotEmpty();
             assertThat(importer.importQueuePerHost).containsKey(new SSTableImporter.ImportId("127.0.0.3", "ks", "tbl"));
