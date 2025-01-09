@@ -29,6 +29,7 @@ public final class ApiEndpointsV1
 
     public static final String HEALTH = "/__health";
     public static final String CASSANDRA = "/cassandra";
+
     public static final String NATIVE = "/native";
     public static final String JMX = "/jmx";
     public static final String KEYSPACE_PATH_PARAM = ":keyspace";
@@ -38,6 +39,8 @@ public final class ApiEndpointsV1
     public static final String INDEX_PATH_PARAM = ":index";
     public static final String UPLOAD_ID_PATH_PARAM = ":uploadId";
     public static final String JOB_ID_PATH_PARAM = ":jobId";
+
+    public static final String OPERATIONAL_JOB_ID_PATH_PARAM = ":operationId";
 
     public static final String PER_KEYSPACE = "/keyspaces/" + KEYSPACE_PATH_PARAM;
     public static final String PER_TABLE = "/tables/" + TABLE_PATH_PARAM;
@@ -118,6 +121,11 @@ public final class ApiEndpointsV1
 
 
     public static final String CONNECTED_CLIENT_STATS_ROUTE = API_V1 + CASSANDRA + "/stats/connected-clients";
+
+    public static final String OPERATIONAL_JOBS = "/operational-jobs";
+    public static final String PER_OPERATIONAL_JOB = OPERATIONAL_JOBS + '/' + OPERATIONAL_JOB_ID_PATH_PARAM;
+    public static final String LIST_OPERATIONAL_JOBS_ROUTE = API_V1 + CASSANDRA + OPERATIONAL_JOBS;
+    public static final String OPERATIONAL_JOB_ROUTE = API_V1 + CASSANDRA + PER_OPERATIONAL_JOB;
 
     private ApiEndpointsV1()
     {

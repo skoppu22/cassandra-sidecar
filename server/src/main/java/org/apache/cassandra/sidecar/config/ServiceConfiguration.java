@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 import io.vertx.core.net.SocketAddress;
 import io.vertx.core.net.impl.SocketAddressImpl;
@@ -33,6 +34,15 @@ public interface ServiceConfiguration
 {
     String SERVICE_POOL = "service";
     String INTERNAL_POOL = "internal";
+    String HOST_ID = UUID.randomUUID().toString();
+
+    /**
+     * @return a unique identifier for the Sidecar instance
+     */
+    default String hostId()
+    {
+        return HOST_ID;
+    }
 
     /**
      * @return Sidecar's HTTP REST API listen address
@@ -88,6 +98,19 @@ public interface ServiceConfiguration
      * @return the number of vertx verticle instances that should be deployed
      */
     int serverVerticleInstances();
+
+    /**
+     * TODO: move operationalJob related configuration to its own class, when the number of configurable fields grows in the future
+     * @return the size of the operational job tracker LRU cache
+     */
+    int operationalJobTrackerSize();
+
+    /**
+     * @return the max wait time in milliseconds for operational job to run internally before returning the http response;
+     *         if the job finishes before the max wait time, it returns immediately on completion;
+     *         otherwise, a response indicating the job is still running is returned after the max wait time.
+     */
+    long operationalJobExecutionMaxWaitTimeInMillis();
 
     /**
      * @return the throttling configuration
@@ -149,4 +172,9 @@ public interface ServiceConfiguration
      * @return the configuration for cdc
      */
     CdcConfiguration cdcConfiguration();
+
+    /**
+     * @return the configuration relevant to the coordination functionality of Sidecar
+     */
+    CoordinationConfiguration coordinationConfiguration();
 }

@@ -19,6 +19,7 @@
 package org.apache.cassandra.sidecar.routes;
 
 import java.util.NoSuchElementException;
+
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -43,7 +44,6 @@ import org.apache.cassandra.sidecar.exceptions.NoSuchSidecarInstanceException;
 import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 
-import static org.apache.cassandra.sidecar.utils.HttpExceptions.cassandraServiceUnavailable;
 import static org.apache.cassandra.sidecar.utils.HttpExceptions.wrapHttpException;
 
 

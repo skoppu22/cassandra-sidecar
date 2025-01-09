@@ -43,6 +43,11 @@ public interface SchemaKeyspaceConfiguration
      */
     int replicationFactor();
 
+    /**
+     * @return the TTL in seconds used to insert entries into the sidecar_lease schema
+     */
+    long leaseSchemaTTLSeconds();
+
     default String createReplicationStrategyString()
     {
         return String.format("{'class':'%s', 'replication_factor':'%s'}", replicationStrategy(), replicationFactor());

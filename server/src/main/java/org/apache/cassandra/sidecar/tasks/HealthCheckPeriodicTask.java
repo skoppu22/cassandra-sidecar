@@ -29,37 +29,37 @@ import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.EventBus;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
+import org.apache.cassandra.sidecar.cluster.InstancesMetadata;
+import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.concurrent.TaskExecutorPool;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
 import org.apache.cassandra.sidecar.metrics.HealthMetrics;
 import org.apache.cassandra.sidecar.metrics.SidecarMetrics;
 
-import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_SERVER_START;
 import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_SERVER_STOP;
 
 /**
- * Periodically checks the health of every instance configured in the {@link InstancesConfig}.
+ * Periodically checks the health of every instance configured in the {@link InstancesMetadata}.
  */
 public class HealthCheckPeriodicTask implements PeriodicTask
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(HealthCheckPeriodicTask.class);
     private final EventBus eventBus;
     private final SidecarConfiguration configuration;
-    private final InstancesConfig instancesConfig;
+    private final InstancesMetadata instancesMetadata;
     private final TaskExecutorPool internalPool;
     private final HealthMetrics metrics;
 
     public HealthCheckPeriodicTask(Vertx vertx,
                                    SidecarConfiguration configuration,
-                                   InstancesConfig instancesConfig,
+                                   InstancesMetadata instancesMetadata,
                                    ExecutorPools executorPools,
                                    SidecarMetrics metrics)
     {
         eventBus = vertx.eventBus();
         this.configuration = configuration;
-        this.instancesConfig = instancesConfig;
+        this.instancesMetadata = instancesMetadata;
         internalPool = executorPools.internal();
         this.metrics = metrics.server().health();
     }
@@ -67,7 +67,6 @@ public class HealthCheckPeriodicTask implements PeriodicTask
     @Override
     public void registerPeriodicTaskExecutor(PeriodicTaskExecutor executor)
     {
-        eventBus.localConsumer(ON_SERVER_START.address(), message -> executor.schedule(this));
         eventBus.localConsumer(ON_SERVER_STOP.address(), message -> executor.unschedule(this));
     }
 
@@ -90,32 +89,14 @@ public class HealthCheckPeriodicTask implements PeriodicTask
     public void execute(Promise<Void> promise)
     {
         AtomicInteger instanceDown = new AtomicInteger(0);
-        List<Future<?>> futures = instancesConfig.instances()
-                                                 .stream()
-                                                 .map(instanceMetadata -> internalPool.executeBlocking(p -> {
-                                                     try
-                                                     {
-                                                         instanceMetadata.delegate().healthCheck();
-                                                         p.complete();
-                                                     }
-                                                     catch (Throwable cause)
-                                                     {
-                                                         instanceDown.incrementAndGet();
-                                                         p.fail(cause);
-                                                         LOGGER.error("Unable to complete health check on instance={}",
-                                                                      instanceMetadata.id(), cause);
-                                                     }
-                                                 }, false))
-                                                 .collect(Collectors.toList());
+        List<Future<?>> futures = instancesMetadata.instances()
+                                                   .stream()
+                                                   .map(instanceMetadata -> healthCheck(instanceMetadata, instanceDown))
+                                                   .collect(Collectors.toList());
 
         // join always waits until all its futures are completed and will not fail as soon as one of the future fails
         Future.join(futures)
-              .onComplete(v -> {
-                  int instanceDownCount = instanceDown.get();
-                  int instanceUpCount = instancesConfig.instances().size() - instanceDownCount;
-                  metrics.cassandraInstancesUp.metric.setValue(instanceUpCount);
-                  metrics.cassandraInstancesDown.metric.setValue(instanceDownCount);
-              })
+              .onComplete(v -> updateMetrics(instanceDown))
               .onSuccess(v -> promise.complete())
               .onFailure(promise::fail);
     }
@@ -124,5 +105,24 @@ public class HealthCheckPeriodicTask implements PeriodicTask
     public String name()
     {
         return "Health Check";
+    }
+
+    private void updateMetrics(AtomicInteger instanceDown)
+    {
+        int instanceDownCount = instanceDown.get();
+        int instanceUpCount = instancesMetadata.instances().size() - instanceDownCount;
+        metrics.cassandraInstancesUp.metric.setValue(instanceUpCount);
+        metrics.cassandraInstancesDown.metric.setValue(instanceDownCount);
+    }
+
+    private Future<Void> healthCheck(InstanceMetadata instanceMetadata, AtomicInteger instanceDown)
+    {
+        return internalPool
+               .runBlocking(() -> instanceMetadata.delegate().healthCheck(), false)
+               .onFailure(cause -> {
+                   instanceDown.incrementAndGet();
+                   LOGGER.error("Unable to complete health check on instance={}",
+                                instanceMetadata.id(), cause);
+               });
     }
 }

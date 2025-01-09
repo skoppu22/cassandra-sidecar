@@ -18,6 +18,8 @@
 
 package org.apache.cassandra.sidecar.common.response.data;
 
+import java.util.Objects;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -44,5 +46,27 @@ public class CdcSegmentInfo
         this.idx = idx;
         this.completed = completed;
         this.lastModifiedTimestamp = lastModifiedTimestamp;
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass())
+        {
+            return false;
+        }
+        CdcSegmentInfo that = (CdcSegmentInfo) o;
+        return size == that.size && idx == that.idx && completed == that.completed && lastModifiedTimestamp == that.lastModifiedTimestamp &&
+                Objects.equals(name, that.name);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(name, size, idx, completed, lastModifiedTimestamp);
     }
 }

@@ -21,6 +21,7 @@ package org.apache.cassandra.sidecar.client;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.cassandra.sidecar.client.retry.ExponentialBackoffRetryPolicy;
 import org.apache.cassandra.sidecar.client.retry.NoRetryPolicy;
@@ -36,8 +37,10 @@ import org.apache.cassandra.sidecar.common.request.CreateSnapshotRequest;
 import org.apache.cassandra.sidecar.common.request.GossipInfoRequest;
 import org.apache.cassandra.sidecar.common.request.GossipStatusRequest;
 import org.apache.cassandra.sidecar.common.request.ImportSSTableRequest;
+import org.apache.cassandra.sidecar.common.request.ListOperationalJobsRequest;
 import org.apache.cassandra.sidecar.common.request.ListSnapshotFilesRequest;
 import org.apache.cassandra.sidecar.common.request.NodeSettingsRequest;
+import org.apache.cassandra.sidecar.common.request.OperationalJobRequest;
 import org.apache.cassandra.sidecar.common.request.Request;
 import org.apache.cassandra.sidecar.common.request.RingRequest;
 import org.apache.cassandra.sidecar.common.request.SSTableComponentRequest;
@@ -73,6 +76,7 @@ public class RequestContext
     protected static final NodeSettingsRequest NODE_SETTINGS_REQUEST = new NodeSettingsRequest();
     protected static final RingRequest RING_REQUEST = new RingRequest();
     protected static final GossipInfoRequest GOSSIP_INFO_REQUEST = new GossipInfoRequest();
+    protected static final ListOperationalJobsRequest LIST_JOBS_REQUEST = new ListOperationalJobsRequest();
     protected static final RetryPolicy DEFAULT_RETRY_POLICY = new NoRetryPolicy();
     protected static final RetryPolicy DEFAULT_EXPONENTIAL_BACKOFF_RETRY_POLICY =
     new ExponentialBackoffRetryPolicy(10, 500L, 60_000L);
@@ -496,6 +500,28 @@ public class RequestContext
         public Builder connectedClientStatsRequest()
         {
             return request(new ConnectedClientStatsRequest());
+        }
+
+        /**
+         * Sets the {@code request} to be a {@link OperationalJobRequest} and returns a reference to this Builder
+         * enabling method chaining.
+         *
+         * @return a reference to this Builder
+         */
+        public Builder operationalJobRequest(UUID jobId)
+        {
+            return request(new OperationalJobRequest(jobId));
+        }
+
+        /**
+         * Sets the {@code request} to be a {@link ListOperationalJobsRequest} and returns a reference to this Builder
+         * enabling method chaining.
+         *
+         * @return a reference to this Builder
+         */
+        public Builder listOperationalJobsRequest()
+        {
+            return request(LIST_JOBS_REQUEST);
         }
 
         /**

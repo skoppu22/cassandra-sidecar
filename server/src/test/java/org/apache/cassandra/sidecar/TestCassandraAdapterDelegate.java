@@ -24,9 +24,11 @@ import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.common.response.NodeSettings;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.common.server.TableOperations;
+import org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException;
 import org.apache.cassandra.sidecar.metrics.instance.InstanceHealthMetrics;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 
+import static org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException.Service.CQL_AND_JMX;
 import static org.apache.cassandra.sidecar.utils.TestMetricUtils.registry;
 
 /**
@@ -58,9 +60,10 @@ public class TestCassandraAdapterDelegate extends CassandraAdapterDelegate
     }
 
     @Override
-    public @Nullable Metadata metadata()
+    @NotNull
+    public Metadata metadata()
     {
-        return metadata;
+        return throwOnNull(metadata);
     }
 
     public void setMetadata(Metadata metadata)
@@ -69,9 +72,10 @@ public class TestCassandraAdapterDelegate extends CassandraAdapterDelegate
     }
 
     @Override
-    public @Nullable TableOperations tableOperations()
+    @NotNull
+    public TableOperations tableOperations()
     {
-        return tableOperations;
+        return throwOnNull(tableOperations);
     }
 
     public void setTableOperations(TableOperations tableOperations)
@@ -80,9 +84,10 @@ public class TestCassandraAdapterDelegate extends CassandraAdapterDelegate
     }
 
     @Override
-    public @Nullable NodeSettings nodeSettings()
+    @NotNull
+    public NodeSettings nodeSettings()
     {
-        return nodeSettings;
+        return throwOnNull(nodeSettings);
     }
 
     public void setNodeSettings(NodeSettings nodeSettings)
@@ -102,9 +107,10 @@ public class TestCassandraAdapterDelegate extends CassandraAdapterDelegate
     }
 
     @Override
-    public @Nullable StorageOperations storageOperations()
+    @NotNull
+    public StorageOperations storageOperations()
     {
-        return storageOperations;
+        return throwOnNull(storageOperations);
     }
 
     public void setStorageOperations(StorageOperations storageOperations)
@@ -115,5 +121,14 @@ public class TestCassandraAdapterDelegate extends CassandraAdapterDelegate
     @Override
     public void close()
     {
+    }
+
+    private <T> T throwOnNull(T value)
+    {
+        if (value == null)
+        {
+            throw new CassandraUnavailableException(CQL_AND_JMX, "Cassandra unavailable");
+        }
+        return value;
     }
 }

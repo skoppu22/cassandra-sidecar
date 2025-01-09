@@ -108,6 +108,22 @@ sidecar:
     keyspace: sidecar_internal
     replication_strategy: SimpleStrategy
     replication_factor: 1
+    # The TTL in seconds used to insert entries into the sidecar_lease schema
+    lease_schema_ttl_sec: 120
+  coordination:
+    # Captures configuration parameters for the task that performs the cluster lease claim process
+    cluster_lease_claim:
+      # Whether the process is enabled
+      enabled: true
+      # The initial delay for the first execution of the cluster lease claim process task after being
+      # scheduled or rescheduled, in milliseconds.
+      # The minimum value for the initial delay is 0.
+      initial_delay_millis: 1000
+      # How often the cluster lease claim process task will execute after the previous task has completed
+      # the execution, in milliseconds.
+      # The minimum value allowed for the cluster lease claim process task implementation is
+      # 30,000 milliseconds (30 seconds)
+      execute_interval_millis: 60000
 
 vertx:
   filesystem_options:
@@ -215,6 +231,7 @@ cassandra_input_validation:
     - system_auth
     - system_views
     - system_virtual_schema
+    - sidecar_internal
   allowed_chars_for_directory: "[a-zA-Z][a-zA-Z0-9_]{0,47}"
   allowed_chars_for_quoted_name: "[a-zA-Z_0-9]{1,48}"
   allowed_chars_for_component_name: "[a-zA-Z0-9_-]+(.db|.cql|.json|.crc32|TOC.txt)"

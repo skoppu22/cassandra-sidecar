@@ -1,7 +1,3 @@
-import org.apache.tools.ant.taskdefs.condition.Os
-
-import java.nio.file.Paths
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,6 +15,10 @@ import java.nio.file.Paths
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+import org.apache.tools.ant.taskdefs.condition.Os
+
+import java.nio.file.Paths
 
 plugins {
     id('idea')
@@ -191,6 +191,8 @@ publishing {
 test {
     systemProperty "vertxweb.environment", "dev"
     systemProperty "vertx.logger-delegate-factory-class-name", "io.vertx.core.logging.SLF4JLogDelegateFactory"
+    // There is no native lib (JNR) for getting time for testing
+    systemProperty "com.datastax.driver.USE_NATIVE_CLOCK", "false"
     // ordinarily we don't need integration tests
     // see the integrationTest task
     useJUnitPlatform()
@@ -198,11 +200,11 @@ test {
         jvmArgs "-XX:-MaxFDLimit"
     }
     reports {
-        junitXml.enabled = true
+        junitXml.setRequired(true)
         def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "test").toFile()
         println("Destination directory for unit tests: ${destDir}")
-        junitXml.destination = destDir
-        html.enabled = true
+        junitXml.getOutputLocation().set(destDir)
+        html.setRequired(true)
     }
     testLogging {
         events "passed", "skipped", "failed"
@@ -261,11 +263,11 @@ def integrationTest = task("integrationTest")
         }
 
         reports {
-            junitXml.enabled = true
+            junitXml.setRequired(true)
             def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "integration").toFile()
             println("Destination directory for integration tests: ${destDir}")
-            junitXml.destination = destDir
-            html.enabled = true
+            junitXml.getOutputLocation().set(destDir)
+            html.setRequired(true)
         }
         testLogging {
             events "started", "passed", "skipped", "failed"
@@ -301,11 +303,11 @@ tasks.register("containerTest", Test) {
 
     useJUnitPlatform()
     reports {
-        junitXml.enabled = true
+        junitXml.setRequired(true)
         def destDir = Paths.get(rootProject.rootDir.absolutePath, "build", "test-results", "containerTest").toFile()
         println("Destination directory for testcontainer tests: ${destDir}")
-        junitXml.destination = destDir
-        html.enabled = true
+        junitXml.getOutputLocation().set(destDir)
+        html.setRequired(true)
     }
     testLogging {
         events "passed", "skipped", "failed"

@@ -21,7 +21,6 @@ package org.apache.cassandra.sidecar.routes.sstableuploads;
 import java.util.concurrent.TimeUnit;
 
 import com.datastax.driver.core.KeyspaceMetadata;
-import com.datastax.driver.core.Metadata;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -31,7 +30,6 @@ import io.vertx.core.file.FileSystem;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
-import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.common.response.SSTableUploadResponse;
 import org.apache.cassandra.sidecar.concurrent.ConcurrencyLimiter;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
@@ -51,7 +49,6 @@ import org.apache.cassandra.sidecar.utils.MetadataUtils;
 import org.apache.cassandra.sidecar.utils.SSTableUploader;
 import org.apache.cassandra.sidecar.utils.SSTableUploadsPathBuilder;
 
-import static org.apache.cassandra.sidecar.utils.HttpExceptions.cassandraServiceUnavailable;
 import static org.apache.cassandra.sidecar.utils.HttpExceptions.wrapHttpException;
 import static org.apache.cassandra.sidecar.utils.MetricUtils.parseSSTableComponent;
 
@@ -71,13 +68,13 @@ public class SSTableUploadHandler extends AbstractHandler<SSTableUploadRequestPa
     /**
      * Constructs a handler with the provided params.
      *
-     * @param vertx                the vertx instance
-     * @param serviceConfiguration configuration object holding config details of Sidecar
-     * @param metadataFetcher      the interface to retrieve metadata
-     * @param uploader             a class that uploads the components
-     * @param uploadPathBuilder    a class that provides SSTableUploads directories
-     * @param executorPools        executor pools for blocking executions
-     * @param validator            a validator instance to validate Cassandra-specific input
+     * @param vertx                 the vertx instance
+     * @param serviceConfiguration  configuration object holding config details of Sidecar
+     * @param metadataFetcher       the interface to retrieve metadata
+     * @param uploader              a class that uploads the components
+     * @param uploadPathBuilder     a class that provides SSTableUploads directories
+     * @param executorPools         executor pools for blocking executions
+     * @param validator             a validator instance to validate Cassandra-specific input
      * @param digestVerifierFactory a factory of checksum verifiers
      */
     @Inject
@@ -191,16 +188,7 @@ public class SSTableUploadHandler extends AbstractHandler<SSTableUploadRequestPa
                                                                        SSTableUploadRequestParam request)
     {
         TaskExecutorPool pool = executorPools.service();
-        return pool.executeBlocking(() -> {
-                       CassandraAdapterDelegate delegate = metadataFetcher.delegate(host);
-                       Metadata metadata = delegate == null ? null : delegate.metadata();
-                       if (metadata == null)
-                       {
-                           throw cassandraServiceUnavailable();
-                       }
-
-                       return metadata;
-                   })
+        return pool.executeBlocking(() -> metadataFetcher.delegate(host).metadata())
                    .compose(metadata -> {
                        KeyspaceMetadata keyspaceMetadata = MetadataUtils.keyspace(metadata, request.keyspace());
                        if (keyspaceMetadata == null)

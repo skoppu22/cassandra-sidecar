@@ -35,14 +35,13 @@ import io.vertx.core.Vertx;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.impl.AbstractClusterUtils;
-import org.apache.cassandra.distributed.impl.InstanceConfig;
 import org.apache.cassandra.distributed.shared.JMXUtil;
 import org.apache.cassandra.sidecar.adapters.base.CassandraFactory;
 import org.apache.cassandra.sidecar.adapters.cassandra41.Cassandra41Factory;
 import org.apache.cassandra.sidecar.cluster.CQLSessionProviderImpl;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
-import org.apache.cassandra.sidecar.cluster.InstancesConfigImpl;
+import org.apache.cassandra.sidecar.cluster.InstancesMetadata;
+import org.apache.cassandra.sidecar.cluster.InstancesMetadataImpl;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadataImpl;
 import org.apache.cassandra.sidecar.common.server.CQLSessionProvider;
@@ -72,9 +71,9 @@ public class CassandraSidecarTestContext implements AutoCloseable
     private final DnsResolver dnsResolver;
     private final AbstractCassandraTestContext abstractCassandraTestContext;
     private final Vertx vertx;
-    private final List<InstanceConfigListener> instanceConfigListeners;
+    private final List<InstancesMetadataListener> instancesMetadataListeners;
     private int numInstancesToManage;
-    public InstancesConfig instancesConfig;
+    public InstancesMetadata instancesMetadata;
     private List<JmxClient> jmxClients;
     private CQLSessionProvider sessionProvider;
     private String username = "cassandra";
@@ -91,7 +90,7 @@ public class CassandraSidecarTestContext implements AutoCloseable
     {
         this.vertx = vertx;
         this.numInstancesToManage = numInstancesToManage;
-        this.instanceConfigListeners = new ArrayList<>();
+        this.instancesMetadataListeners = new ArrayList<>();
         this.abstractCassandraTestContext = abstractCassandraTestContext;
         this.version = version;
         this.versionProvider = versionProvider;
@@ -128,7 +127,7 @@ public class CassandraSidecarTestContext implements AutoCloseable
                .build();
     }
 
-    private static int tryGetIntConfig(IInstanceConfig config, String configName, int defaultValue)
+    public static int tryGetIntConfig(IInstanceConfig config, String configName, int defaultValue)
     {
         try
         {
@@ -140,9 +139,9 @@ public class CassandraSidecarTestContext implements AutoCloseable
         }
     }
 
-    public void registerInstanceConfigListener(InstanceConfigListener listener)
+    public void registerInstanceConfigListener(InstancesMetadataListener listener)
     {
-        this.instanceConfigListeners.add(listener);
+        this.instancesMetadataListeners.add(listener);
     }
 
     public AbstractCassandraTestContext cassandraTestContext()
@@ -168,37 +167,37 @@ public class CassandraSidecarTestContext implements AutoCloseable
     public void setNumInstancesToManage(int numInstancesToManage)
     {
         this.numInstancesToManage = numInstancesToManage;
-        refreshInstancesConfig();
+        refreshInstancesMetadata();
     }
 
     public void setUsernamePassword(String username, String password)
     {
         this.username = username;
         this.password = password;
-        refreshInstancesConfig();
+        refreshInstancesMetadata();
     }
 
     public void setSslConfiguration(SslConfiguration sslConfiguration)
     {
         this.sslConfiguration = sslConfiguration;
-        refreshInstancesConfig();
+        refreshInstancesMetadata();
     }
 
-    public InstancesConfig instancesConfig()
+    public InstancesMetadata instancesMetadata()
     {
-        if (instancesConfig == null)
+        if (instancesMetadata == null)
         {
-            refreshInstancesConfig();
+            refreshInstancesMetadata();
         }
-        return this.instancesConfig;
+        return this.instancesMetadata;
     }
 
-    public InstancesConfig refreshInstancesConfig()
+    public InstancesMetadata refreshInstancesMetadata()
     {
         // clean-up any open sessions or client resources
         close();
-        setInstancesConfig();
-        return this.instancesConfig;
+        setInstancesMetadata();
+        return this.instancesMetadata;
     }
 
     public Session session()
@@ -228,28 +227,28 @@ public class CassandraSidecarTestContext implements AutoCloseable
     @Override
     public void close()
     {
-        if (instancesConfig != null)
+        if (instancesMetadata != null)
         {
-            instancesConfig.instances().forEach(instance -> instance.delegate().close());
+            instancesMetadata.instances().forEach(instance -> instance.delegate().close());
         }
     }
 
-    private void setInstancesConfig()
+    private void setInstancesMetadata()
     {
-        this.instancesConfig = buildInstancesConfig(versionProvider, dnsResolver);
-        for (InstanceConfigListener listener : instanceConfigListeners)
+        this.instancesMetadata = buildInstancesMetadata(versionProvider, dnsResolver);
+        for (InstancesMetadataListener listener : instancesMetadataListeners)
         {
-            listener.onInstancesConfigChange(this.instancesConfig);
+            listener.onInstancesMetadataChange(this.instancesMetadata);
         }
     }
 
-    private InstancesConfig buildInstancesConfig(CassandraVersionProvider versionProvider,
-                                                 DnsResolver dnsResolver)
+    private InstancesMetadata buildInstancesMetadata(CassandraVersionProvider versionProvider,
+                                                     DnsResolver dnsResolver)
     {
         UpgradeableCluster cluster = cluster();
         List<InstanceMetadata> metadata = new ArrayList<>();
         jmxClients = new ArrayList<>();
-        List<InstanceConfig> configs = buildInstanceConfigs(cluster);
+        List<IInstanceConfig> configs = buildInstanceConfigs(cluster);
         List<InetSocketAddress> addresses = buildContactList(configs);
         sessionProvider = new CQLSessionProviderImpl(addresses, addresses, 500, null,
                                                      0, username, password,
@@ -302,10 +301,10 @@ public class CassandraSidecarTestContext implements AutoCloseable
                                              .metricRegistry(instanceSpecificRegistry)
                                              .build());
         }
-        return new InstancesConfigImpl(metadata, dnsResolver);
+        return new InstancesMetadataImpl(metadata, dnsResolver);
     }
 
-    private List<InetSocketAddress> buildContactList(List<InstanceConfig> configs)
+    private static List<InetSocketAddress> buildContactList(List<IInstanceConfig> configs)
     {
         // Always return the complete list of addresses even if the cluster isn't yet that large
         // this way, we populate the entire local instance list
@@ -317,7 +316,7 @@ public class CassandraSidecarTestContext implements AutoCloseable
     }
 
     @NotNull
-    private List<InstanceConfig> buildInstanceConfigs(UpgradeableCluster cluster)
+    private List<IInstanceConfig> buildInstanceConfigs(UpgradeableCluster cluster)
     {
         int nodes = numInstancesToManage == -1 ? cluster.size() : numInstancesToManage;
         return IntStream.range(1, nodes + 1)
@@ -341,10 +340,10 @@ public class CassandraSidecarTestContext implements AutoCloseable
     }
 
     /**
-     * A listener for {@link InstancesConfig} state changes
+     * A listener for {@link InstancesMetadata} state changes
      */
-    public interface InstanceConfigListener
+    public interface InstancesMetadataListener
     {
-        void onInstancesConfigChange(InstancesConfig instancesConfig);
+        void onInstancesMetadataChange(InstancesMetadata instancesMetadata);
     }
 }

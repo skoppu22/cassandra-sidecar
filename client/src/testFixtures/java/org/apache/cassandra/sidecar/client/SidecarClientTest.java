@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +46,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -59,6 +61,7 @@ import org.apache.cassandra.sidecar.client.request.RequestExecutorTest;
 import org.apache.cassandra.sidecar.client.retry.RetryAction;
 import org.apache.cassandra.sidecar.client.retry.RetryPolicy;
 import org.apache.cassandra.sidecar.common.ApiEndpointsV1;
+import org.apache.cassandra.sidecar.common.data.OperationalJobStatus;
 import org.apache.cassandra.sidecar.common.data.RestoreJobSecrets;
 import org.apache.cassandra.sidecar.common.request.ImportSSTableRequest;
 import org.apache.cassandra.sidecar.common.request.NodeSettingsRequest;
@@ -70,13 +73,17 @@ import org.apache.cassandra.sidecar.common.response.ConnectedClientStatsResponse
 import org.apache.cassandra.sidecar.common.response.GossipInfoResponse;
 import org.apache.cassandra.sidecar.common.response.GossipStatusResponse;
 import org.apache.cassandra.sidecar.common.response.HealthResponse;
+import org.apache.cassandra.sidecar.common.response.ListCdcSegmentsResponse;
+import org.apache.cassandra.sidecar.common.response.ListOperationalJobsResponse;
 import org.apache.cassandra.sidecar.common.response.ListSnapshotFilesResponse;
 import org.apache.cassandra.sidecar.common.response.NodeSettings;
+import org.apache.cassandra.sidecar.common.response.OperationalJobResponse;
 import org.apache.cassandra.sidecar.common.response.RingResponse;
 import org.apache.cassandra.sidecar.common.response.SSTableImportResponse;
 import org.apache.cassandra.sidecar.common.response.SchemaResponse;
 import org.apache.cassandra.sidecar.common.response.TimeSkewResponse;
 import org.apache.cassandra.sidecar.common.response.TokenRangeReplicasResponse;
+import org.apache.cassandra.sidecar.common.response.data.CdcSegmentInfo;
 import org.apache.cassandra.sidecar.common.response.data.ClientConnectionEntry;
 import org.apache.cassandra.sidecar.common.response.data.CreateRestoreJobResponsePayload;
 import org.apache.cassandra.sidecar.common.response.data.RingEntry;
@@ -90,6 +97,7 @@ import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.netty.handler.codec.http.HttpResponseStatus.PARTIAL_CONTENT;
 import static org.apache.cassandra.sidecar.common.ApiEndpointsV1.JOB_ID_PATH_PARAM;
 import static org.apache.cassandra.sidecar.common.ApiEndpointsV1.KEYSPACE_PATH_PARAM;
+import static org.apache.cassandra.sidecar.common.ApiEndpointsV1.OPERATIONAL_JOB_ID_PATH_PARAM;
 import static org.apache.cassandra.sidecar.common.ApiEndpointsV1.TABLE_PATH_PARAM;
 import static org.apache.cassandra.sidecar.common.http.SidecarHttpHeaderNames.CONTENT_XXHASH32;
 import static org.apache.cassandra.sidecar.common.http.SidecarHttpHeaderNames.CONTENT_XXHASH32_SEED;
@@ -1298,6 +1306,56 @@ abstract class SidecarClientTest
     }
 
     @Test
+    public void testOperationalJobs() throws Exception
+    {
+        UUID jobId = UUID.randomUUID();
+        String jobStatusAsString = "{\"jobId\":\"" + jobId + "\",\"jobStatus\":\"RUNNING\",\"operation\":\"test\"}";
+
+        MockResponse response = new MockResponse()
+                                .setResponseCode(OK.code())
+                                .setHeader("content-type", "application/json")
+                                .setBody(jobStatusAsString);
+        enqueue(response);
+
+        for (MockWebServer server : servers)
+        {
+            SidecarInstanceImpl sidecarInstance = RequestExecutorTest.newSidecarInstance(server);
+            OperationalJobResponse result = client.operationalJobs(sidecarInstance, jobId).get(30, TimeUnit.SECONDS);
+            assertThat(result).isNotNull();
+            assertThat(result.jobId()).isEqualTo(jobId);
+            assertThat(result.status()).isEqualTo(OperationalJobStatus.RUNNING);
+            assertThat(result.operation()).isEqualTo("test");
+            validateResponseServed(server,
+                                   ApiEndpointsV1.OPERATIONAL_JOB_ROUTE.replaceAll(OPERATIONAL_JOB_ID_PATH_PARAM, jobId.toString()),
+                                   req -> { });
+        }
+    }
+
+    @Test
+    public void testlistOperationalJobs() throws Exception
+    {
+        UUID jobId = UUID.randomUUID();
+        String listJobsString = "{\"jobs\":[{\"jobId\":\"" + jobId + "\",\"status\":\"RUNNING\",\"failureReason\":\"\",\"operation\":\"test\"}]}";
+
+        MockResponse response = new MockResponse()
+                                .setResponseCode(OK.code())
+                                .setHeader("content-type", "application/json")
+                                .setBody(listJobsString);
+
+        enqueue(response);
+
+        for (MockWebServer server : servers)
+        {
+            SidecarInstanceImpl sidecarInstance = RequestExecutorTest.newSidecarInstance(server);
+            ListOperationalJobsResponse result = client.listOperationalJobs(sidecarInstance).get(30, TimeUnit.SECONDS);
+            assertThat(result).isNotNull();
+            assertThat(result.jobs()).isNotNull();
+            assertThat(result.jobs().get(0).jobId()).isEqualTo(jobId);
+            validateResponseServed(server, ApiEndpointsV1.LIST_OPERATIONAL_JOBS_ROUTE, req -> { });
+        }
+    }
+
+    @Test
     void testFailsWithOneAttemptPerServer()
     {
         for (MockWebServer server : servers)
@@ -1447,28 +1505,103 @@ abstract class SidecarClientTest
 
         MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(connectedClientStatsResponseAsString);
         enqueue(response);
-        ConnectedClientStatsResponse result = client.connectedClientStats().get();
 
+        for (MockWebServer server : servers)
+        {
+            SidecarInstanceImpl sidecarInstance = RequestExecutorTest.newSidecarInstance(server);
+            ConnectedClientStatsResponse result = client.connectedClientStats(sidecarInstance).get();
+
+            assertThat(result).isNotNull();
+            assertThat(result.clientConnections()).isNotNull().hasSize(1);
+            assertThat(result.totalConnectedClients()).isNotNull().isEqualTo(1);
+            assertThat(result.connectionsByUser()).isNotNull().containsKey("anonymous");
+            ClientConnectionEntry entry = result.clientConnections().iterator().next();
+            assertThat(entry.address()).isEqualTo("127.0.0.1");
+            assertThat(entry.port()).isEqualTo(54628);
+            assertThat(entry.sslEnabled()).isEqualTo(false);
+            assertThat(entry.sslCipherSuite()).isEqualTo("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256");
+            assertThat(entry.sslProtocol()).isEqualTo("TLSv1.2");
+            assertThat(entry.protocolVersion()).isEqualTo("5");
+            assertThat(entry.username()).isEqualTo("anonymous");
+            assertThat(entry.requestCount()).isEqualTo(39);
+            assertThat(entry.driverName()).isEqualTo("DataStax Java Driver");
+            assertThat(entry.driverVersion()).isEqualTo("3.11.3");
+            assertThat(entry.keyspaceName()).isEqualTo("test");
+            assertThat(entry.authenticationMode()).isEqualTo("MutualTls");
+            assertThat(entry.authenticationMetadata()).containsKey("identity");
+            assertThat(entry.clientOptions()).containsKeys("CQL_VERSION", "DRIVER_NAME", "DRIVER_VERSION");
+            validateResponseServed(server, ApiEndpointsV1.CONNECTED_CLIENT_STATS_ROUTE, req -> { });
+        }
+    }
+
+    @Test
+    public void testListCdcSegments() throws ExecutionException, InterruptedException, JsonProcessingException
+    {
+        List<CdcSegmentInfo> segments = Arrays.asList(new CdcSegmentInfo("commit-log1", 100, 100, true, 1732148713725L),
+                new CdcSegmentInfo("commit-log2", 100, 10, false, 1732148713725L));
+        ListCdcSegmentsResponse listSegmentsResponse = new ListCdcSegmentsResponse("localhost", 9043, segments);
+        ObjectMapper mapper = new ObjectMapper();
+
+        MockResponse response = new MockResponse();
+        response.setResponseCode(200);
+        response.setHeader("content-type", "application/json");
+        response.setBody(mapper.writeValueAsString(listSegmentsResponse));
+        enqueue(response);
+
+        SidecarInstance instance = instances.get(0);
+        ListCdcSegmentsResponse result = client.listCdcSegments(instance).get();
         assertThat(result).isNotNull();
-        assertThat(result.clientConnections()).isNotNull().hasSize(1);
-        assertThat(result.totalConnectedClients()).isNotNull().isEqualTo(1);
-        assertThat(result.connectionsByUser()).isNotNull().containsKey("anonymous");
-        ClientConnectionEntry entry = result.clientConnections().iterator().next();
-        assertThat(entry.address()).isEqualTo("127.0.0.1");
-        assertThat(entry.port()).isEqualTo(54628);
-        assertThat(entry.sslEnabled()).isEqualTo(false);
-        assertThat(entry.sslCipherSuite()).isEqualTo("TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256");
-        assertThat(entry.sslProtocol()).isEqualTo("TLSv1.2");
-        assertThat(entry.protocolVersion()).isEqualTo("5");
-        assertThat(entry.username()).isEqualTo("anonymous");
-        assertThat(entry.requestCount()).isEqualTo(39);
-        assertThat(entry.driverName()).isEqualTo("DataStax Java Driver");
-        assertThat(entry.driverVersion()).isEqualTo("3.11.3");
-        assertThat(entry.keyspaceName()).isEqualTo("test");
-        assertThat(entry.authenticationMode()).isEqualTo("MutualTls");
-        assertThat(entry.authenticationMetadata()).containsKey("identity");
-        assertThat(entry.clientOptions()).containsKeys("CQL_VERSION", "DRIVER_NAME", "DRIVER_VERSION");
-        validateResponseServed(ApiEndpointsV1.CONNECTED_CLIENT_STATS_ROUTE);
+        assertThat(result).isEqualTo(listSegmentsResponse);
+        validateResponseServed(ApiEndpointsV1.LIST_CDC_SEGMENTS_ROUTE);
+    }
+
+    @Test
+    public void testStreamCdcSegments() throws InterruptedException
+    {
+        MockResponse response = new MockResponse();
+        // mock reading the first 12 bytes, i.e. "Test Content" from a large blob (1024).
+        response.setResponseCode(200)
+                .setHeader(HttpHeaderNames.CONTENT_TYPE.toString(),
+                           HttpHeaderValues.APPLICATION_OCTET_STREAM)
+                .setHeader(HttpHeaderNames.ACCEPT_RANGES.toString(), "bytes")
+                .setHeader(HttpHeaderNames.CONTENT_RANGE.toString(), "bytes 0-11/1024")
+                .setBody("Test Content");
+        enqueue(response);
+
+        SidecarInstance instance = instances.get(0);
+        CountDownLatch latch = new CountDownLatch(1);
+        List<byte[]> receivedBytes = new ArrayList<>();
+        StreamConsumer mockStreamConsumer = new StreamConsumer()
+        {
+            @Override
+            public void onRead(StreamBuffer buffer)
+            {
+                assertThat(buffer.readableBytes()).isGreaterThan(0);
+                byte[] dst = new byte[buffer.readableBytes()];
+                buffer.copyBytes(0, dst, 0, buffer.readableBytes());
+                receivedBytes.add(dst);
+            }
+
+            @Override
+            public void onComplete()
+            {
+                latch.countDown();
+            }
+
+            @Override
+            public void onError(Throwable throwable)
+            {
+                latch.countDown();
+            }
+        };
+        client.streamCdcSegments(instance, "testSegment", HttpRange.of(0, 11), mockStreamConsumer);
+        latch.await();
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        for (byte[] bytes : receivedBytes)
+        {
+            baos.write(bytes, 0, bytes.length);
+        }
+        assertThat(new String(baos.toByteArray(), StandardCharsets.UTF_8)).isEqualTo("Test Content");
     }
 
     private void enqueue(MockResponse response)
@@ -1490,16 +1623,26 @@ abstract class SidecarClientTest
     {
         for (MockWebServer server : servers)
         {
-            if (server.getRequestCount() > 0)
+            if (validateResponseServed(server, expectedEndpointPath, serverReceivedRequestVerifier))
             {
-                assertThat(server.getRequestCount()).isEqualTo(1);
-                RecordedRequest request = server.takeRequest();
-                serverReceivedRequestVerifier.accept(request);
-                assertThat(request.getPath()).isEqualTo(expectedEndpointPath);
                 return;
             }
         }
         fail("The request was not served by any of the provided servers");
+    }
+
+    private boolean validateResponseServed(MockWebServer server, String expectedEndpointPath, Consumer<RecordedRequest> serverReceivedRequestVerifier)
+    throws InterruptedException
+    {
+        if (server.getRequestCount() > 0)
+        {
+            assertThat(server.getRequestCount()).isEqualTo(1);
+            RecordedRequest request = server.takeRequest();
+            serverReceivedRequestVerifier.accept(request);
+            assertThat(request.getPath()).isEqualTo(expectedEndpointPath);
+            return true;
+        }
+        return false;
     }
 
     private InputStream resourceInputStream(String name)

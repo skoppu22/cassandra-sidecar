@@ -34,4 +34,10 @@ public class TestVersion
     {
         return version;
     }
+
+    @Override
+    public String toString()
+    {
+        return version;
+    }
 }

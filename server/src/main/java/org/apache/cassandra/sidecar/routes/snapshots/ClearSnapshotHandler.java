@@ -27,7 +27,6 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
 import io.vertx.ext.web.RoutingContext;
-import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.routes.AbstractHandler;
@@ -35,7 +34,6 @@ import org.apache.cassandra.sidecar.routes.data.SnapshotRequestParam;
 import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 
-import static org.apache.cassandra.sidecar.utils.HttpExceptions.cassandraServiceUnavailable;
 import static org.apache.cassandra.sidecar.utils.HttpExceptions.wrapHttpException;
 
 /**
@@ -69,14 +67,8 @@ public class ClearSnapshotHandler extends AbstractHandler<SnapshotRequestParam>
                                SocketAddress remoteAddress,
                                SnapshotRequestParam requestParams)
     {
+        StorageOperations storageOperations = metadataFetcher.delegate(host).storageOperations();
         executorPools.service().runBlocking(() -> {
-            CassandraAdapterDelegate delegate = metadataFetcher.delegate(host(context));
-            StorageOperations storageOperations = delegate == null ? null : delegate.storageOperations();
-            if (storageOperations == null)
-            {
-                throw cassandraServiceUnavailable();
-            }
-
             logger.debug("Clearing snapshot request={}, remoteAddress={}, instance={}",
                          requestParams, remoteAddress, host);
             storageOperations.clearSnapshot(requestParams.snapshotName(), requestParams.keyspace(),

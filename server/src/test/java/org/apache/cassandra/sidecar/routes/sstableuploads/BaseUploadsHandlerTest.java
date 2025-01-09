@@ -52,7 +52,7 @@ import org.apache.cassandra.sidecar.TestCassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.TestModule;
 import org.apache.cassandra.sidecar.adapters.base.CassandraTableOperations;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
+import org.apache.cassandra.sidecar.cluster.InstancesMetadata;
 import org.apache.cassandra.sidecar.config.SSTableUploadConfiguration;
 import org.apache.cassandra.sidecar.config.ServiceConfiguration;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
@@ -68,7 +68,7 @@ import static org.apache.cassandra.sidecar.config.yaml.TrafficShapingConfigurati
 import static org.apache.cassandra.sidecar.config.yaml.TrafficShapingConfigurationImpl.DEFAULT_MAX_DELAY_TIME;
 import static org.apache.cassandra.sidecar.config.yaml.TrafficShapingConfigurationImpl.DEFAULT_OUTBOUND_GLOBAL_BANDWIDTH_LIMIT;
 import static org.apache.cassandra.sidecar.config.yaml.TrafficShapingConfigurationImpl.DEFAULT_PEAK_OUTBOUND_GLOBAL_BANDWIDTH_LIMIT;
-import static org.apache.cassandra.sidecar.snapshots.SnapshotUtils.mockInstancesConfig;
+import static org.apache.cassandra.sidecar.snapshots.SnapshotUtils.mockInstancesMetadata;
 import static org.apache.cassandra.sidecar.utils.TestMetricUtils.registry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -213,9 +213,9 @@ class BaseUploadsHandlerTest
 
         @Provides
         @Singleton
-        public InstancesConfig instancesConfig(Vertx vertx)
+        public InstancesMetadata instancesMetadata(Vertx vertx)
         {
-            return mockInstancesConfig(vertx, canonicalTemporaryPath, delegate, null);
+            return mockInstancesMetadata(vertx, canonicalTemporaryPath, delegate, null);
         }
 
         @Singleton

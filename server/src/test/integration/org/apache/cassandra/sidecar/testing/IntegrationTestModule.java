@@ -29,7 +29,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
 import io.vertx.core.Vertx;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
+import org.apache.cassandra.sidecar.cluster.InstancesMetadata;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.common.server.CQLSessionProvider;
 import org.apache.cassandra.sidecar.config.AccessControlConfiguration;
@@ -47,9 +47,9 @@ import org.apache.cassandra.sidecar.config.yaml.SchemaKeyspaceConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.SidecarConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.SslConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.TestServiceConfiguration;
+import org.apache.cassandra.sidecar.coordination.ClusterLease;
 import org.apache.cassandra.sidecar.exceptions.NoSuchSidecarInstanceException;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_SERVER_STOP;
 
@@ -80,9 +80,9 @@ public class IntegrationTestModule extends AbstractModule
 
     @Provides
     @Singleton
-    public InstancesConfig instancesConfig()
+    public InstancesMetadata instancesMetadata()
     {
-        return new WrapperInstancesConfig();
+        return new WrapperInstancesMetadata();
     }
 
     @Provides
@@ -125,7 +125,8 @@ public class IntegrationTestModule extends AbstractModule
         CQLSessionProvider cqlSessionProvider = new CQLSessionProvider()
         {
             @Override
-            public @Nullable Session get()
+            @NotNull
+            public Session get()
             {
                 return cassandraTestContext.session();
             }
@@ -137,13 +138,20 @@ public class IntegrationTestModule extends AbstractModule
             }
 
             @Override
-            public @Nullable Session getIfConnected()
+            public Session getIfConnected()
             {
                 return get();
             }
         };
         vertx.eventBus().localConsumer(ON_SERVER_STOP.address(), message -> cqlSessionProvider.close());
         return cqlSessionProvider;
+    }
+
+    @Provides
+    @Singleton
+    public ClusterLease clusterLease()
+    {
+        return new ClusterLease(ClusterLease.Ownership.CLAIMED);
     }
 
     private AccessControlConfiguration accessControlConfiguration()
@@ -162,7 +170,7 @@ public class IntegrationTestModule extends AbstractModule
                                                   new CacheConfigurationImpl());
     }
 
-    class WrapperInstancesConfig implements InstancesConfig
+    class WrapperInstancesMetadata implements InstancesMetadata
     {
         /**
          * @return metadata of instances owned by the sidecar
@@ -172,7 +180,7 @@ public class IntegrationTestModule extends AbstractModule
         public List<InstanceMetadata> instances()
         {
             if (cassandraTestContext != null && cassandraTestContext.isClusterBuilt())
-                return cassandraTestContext.instancesConfig().instances();
+                return cassandraTestContext.instancesMetadata().instances();
             return Collections.emptyList();
         }
 
@@ -186,7 +194,7 @@ public class IntegrationTestModule extends AbstractModule
         @Override
         public InstanceMetadata instanceFromId(int id) throws NoSuchSidecarInstanceException
         {
-            return cassandraTestContext.instancesConfig().instanceFromId(id);
+            return cassandraTestContext.instancesMetadata().instanceFromId(id);
         }
 
         /**
@@ -199,7 +207,7 @@ public class IntegrationTestModule extends AbstractModule
         @Override
         public InstanceMetadata instanceFromHost(String host) throws NoSuchSidecarInstanceException
         {
-            return cassandraTestContext.instancesConfig().instanceFromHost(host);
+            return cassandraTestContext.instancesMetadata().instanceFromHost(host);
         }
     }
 }
