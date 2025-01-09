@@ -1579,9 +1579,10 @@ abstract class SidecarClientTest
     {
         String responseAsString = "{\"SSTablePreemptiveOpenInterval\":30}";
 
+        SidecarInstanceImpl sidecarInstance = instances.get(3);
         MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(responseAsString);
         enqueue(response);
-        GetPreemptiveOpenIntervalResponse result = client.getPreemptiveOpenInterval().get();
+        GetPreemptiveOpenIntervalResponse result = client.getPreemptiveOpenInterval(sidecarInstance).get();
 
         assertThat(result).isNotNull();
         assertThat(result.sstablePreemptiveOpenInterval()).isNotNull().isEqualTo(30);
@@ -1592,9 +1593,11 @@ abstract class SidecarClientTest
     {
         String responseAsString = "{\"SSTablePreemptiveOpenInterval\":40}";
 
+        SidecarInstanceImpl sidecarInstance = instances.get(3);
         MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(responseAsString);
         enqueue(response);
-        GetPreemptiveOpenIntervalResponse result = client.getPreemptiveOpenInterval("MiB").get();
+        GetPreemptiveOpenIntervalResponse result = client.getPreemptiveOpenInterval(sidecarInstance,
+                                                                                    "MiB").get();
 
         assertThat(result).isNotNull();
         assertThat(result.sstablePreemptiveOpenInterval()).isNotNull().isEqualTo(40);

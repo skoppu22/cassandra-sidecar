@@ -669,9 +669,10 @@ public class SidecarClient implements AutoCloseable, SidecarClientBlobRestoreExt
      * Executes GET preemptive open interval request using the default retry policy and configured selection policy
      * @return a completable future with {@link GetPreemptiveOpenIntervalResponse}
      */
-    public CompletableFuture<GetPreemptiveOpenIntervalResponse> getPreemptiveOpenInterval()
+    public CompletableFuture<GetPreemptiveOpenIntervalResponse> getPreemptiveOpenInterval(SidecarInstance instance)
     {
         return executeRequestAsync(requestBuilder()
+                                   .singleInstanceSelectionPolicy(instance)
                                    .getPreemptiveOpenIntervalRequest()
                                    .build());
     }
@@ -682,9 +683,11 @@ public class SidecarClient implements AutoCloseable, SidecarClientBlobRestoreExt
      * @param unit query param, data storage units of preemptive open interval value
      * @return a completable future with {@link GetPreemptiveOpenIntervalResponse}
      */
-    public CompletableFuture<GetPreemptiveOpenIntervalResponse> getPreemptiveOpenInterval(String unit)
+    public CompletableFuture<GetPreemptiveOpenIntervalResponse> getPreemptiveOpenInterval(SidecarInstance instance,
+                                                                                          String unit)
     {
         return executeRequestAsync(requestBuilder()
+                                   .singleInstanceSelectionPolicy(instance)
                                    .getPreemptiveOpenIntervalRequest(unit)
                                    .build());
     }

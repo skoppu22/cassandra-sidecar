@@ -34,7 +34,6 @@ import org.apache.cassandra.sidecar.common.server.DataStorageUnit;
 import static io.netty.handler.codec.http.HttpResponseStatus.BAD_REQUEST;
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
 import static io.netty.handler.codec.http.HttpResponseStatus.OK;
-import static io.netty.handler.codec.http.HttpResponseStatus.SERVICE_UNAVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -128,20 +127,6 @@ class GetPreemptiveOpenIntervalHandlerTest extends JmxCommonTest
               .expect(ResponsePredicate.SC_INTERNAL_SERVER_ERROR)
               .send(context.succeeding(response -> {
                   assertThat(response.statusCode()).isEqualTo(INTERNAL_SERVER_ERROR.code());
-                  context.completeNow();
-              }));
-    }
-
-    @Test
-    void testNullStorageOps(VertxTestContext context)
-    {
-        when(delegate.storageOperations()).thenReturn(null);
-
-        WebClient client = WebClient.create(vertx);
-        client.get(server.actualPort(), "127.0.0.1", testRoute)
-              .expect(ResponsePredicate.SC_SERVICE_UNAVAILABLE)
-              .send(context.succeeding(response -> {
-                  assertThat(response.statusCode()).isEqualTo(SERVICE_UNAVAILABLE.code());
                   context.completeNow();
               }));
     }

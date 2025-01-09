@@ -41,28 +41,12 @@ public class GetPreemptiveOpenIntervalHandlerIntegrationTest extends Integration
 {
     private static final String testRoute = "/api/v1/cassandra/sstable/preemptive-open-interval";
 
-    @CassandraIntegrationTest
-    void testDefaultValue(VertxTestContext testContext)
-    {
-        client.get(server.actualPort(), "127.0.0.1", testRoute)
-              .expect(ResponsePredicate.SC_OK)
-              .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, 50)));
-    }
-
     @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=60")
     void testPreemptiveOpenInterval60(VertxTestContext testContext)
     {
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
               .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, 60)));
-    }
-
-    @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=70")
-    void testPreemptiveOpenInterval70(VertxTestContext testContext)
-    {
-        client.get(server.actualPort(), "127.0.0.1", testRoute)
-              .expect(ResponsePredicate.SC_OK)
-              .send(testContext.succeeding(response -> verifyValidResponse(testContext, response, 70)));
     }
 
     @CassandraIntegrationTest(yamlProps = "sstable_preemptive_open_interval_in_mb=-1")

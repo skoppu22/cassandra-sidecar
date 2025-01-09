@@ -38,7 +38,7 @@ import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxTestContext;
 import org.apache.cassandra.sidecar.TestModule;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
+import org.apache.cassandra.sidecar.cluster.InstancesMetadata;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.server.MainModule;
@@ -85,7 +85,7 @@ class JmxCommonTest
     {
         @Provides
         @Singleton
-        public InstancesConfig instanceConfig()
+        public InstancesMetadata instanceConfig()
         {
             int instanceId1 = 100;
             String host1 = "127.0.0.1";
@@ -107,14 +107,14 @@ class JmxCommonTest
             when(instanceMetadata1.delegate()).thenReturn(delegate);
             when(instanceMetadata2.delegate()).thenReturn(delegate);
 
-            InstancesConfig mockInstancesConfig = mock(InstancesConfig.class);
-            when(mockInstancesConfig.instances()).thenReturn(ImmutableList.of(instanceMetadata1, instanceMetadata2));
-            when(mockInstancesConfig.instanceFromId(instanceId1)).thenReturn(instanceMetadata1);
-            when(mockInstancesConfig.instanceFromHost(host1)).thenReturn(instanceMetadata1);
-            when(mockInstancesConfig.instanceFromId(instanceId2)).thenReturn(instanceMetadata2);
-            when(mockInstancesConfig.instanceFromHost(host2)).thenReturn(instanceMetadata2);
+            InstancesMetadata mockInstancesMetadata = mock(InstancesMetadata.class);
+            when(mockInstancesMetadata.instances()).thenReturn(ImmutableList.of(instanceMetadata1, instanceMetadata2));
+            when(mockInstancesMetadata.instanceFromId(instanceId1)).thenReturn(instanceMetadata1);
+            when(mockInstancesMetadata.instanceFromHost(host1)).thenReturn(instanceMetadata1);
+            when(mockInstancesMetadata.instanceFromId(instanceId2)).thenReturn(instanceMetadata2);
+            when(mockInstancesMetadata.instanceFromHost(host2)).thenReturn(instanceMetadata2);
 
-            return mockInstancesConfig;
+            return mockInstancesMetadata;
         }
     }
 }
