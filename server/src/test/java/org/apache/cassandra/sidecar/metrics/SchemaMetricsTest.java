@@ -24,7 +24,6 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,6 +40,7 @@ import org.apache.cassandra.sidecar.TestModule;
 import org.apache.cassandra.sidecar.common.server.CQLSessionProvider;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
+import org.apache.cassandra.sidecar.coordination.ClusterLease;
 import org.apache.cassandra.sidecar.db.SidecarSchemaTest;
 import org.apache.cassandra.sidecar.db.schema.SidecarInternalKeyspace;
 import org.apache.cassandra.sidecar.db.schema.SidecarSchema;
@@ -58,7 +58,7 @@ import static org.mockito.Mockito.when;
 /**
  * Tests metrics emitted for {@link SidecarSchema}
  */
-public class SchemaMetricsTest
+class SchemaMetricsTest
 {
     private static final Logger logger = LoggerFactory.getLogger(SidecarSchemaTest.class);
     private Vertx vertx;
@@ -67,7 +67,7 @@ public class SchemaMetricsTest
     Server server;
 
     @BeforeEach
-    public void setUp() throws InterruptedException
+    void setUp() throws InterruptedException
     {
         Injector injector = Guice.createInjector(Modules.override(new MainModule())
                                                         .with(Modules.override(new TestModule())
@@ -85,7 +85,7 @@ public class SchemaMetricsTest
     }
 
     @AfterEach
-    public void tearDown() throws InterruptedException
+    void tearDown() throws InterruptedException
     {
         CountDownLatch closeLatch = new CountDownLatch(1);
         registry().removeMatching((name, metric) -> true);
@@ -97,7 +97,7 @@ public class SchemaMetricsTest
     }
 
     @Test
-    public void testSchemaModificationFailure()
+    void testSchemaModificationFailure()
     {
         sidecarSchema.startSidecarSchemaInitializer();
         loopAssert(3, () -> {
@@ -130,12 +130,19 @@ public class SchemaMetricsTest
                                            SidecarMetrics metrics)
         {
             SidecarInternalKeyspace sidecarInternalKeyspace = mock(SidecarInternalKeyspace.class);
-            when(sidecarInternalKeyspace.initialize(any()))
+            when(sidecarInternalKeyspace.initialize(any(), any()))
             .thenThrow(new SidecarSchemaModificationException("Simulated failure",
                                                               new RuntimeException("Simulated exception")));
             SchemaMetrics schemaMetrics = metrics.server().schema();
             return new SidecarSchema(vertx, executorPools, configuration,
-                                     sidecarInternalKeyspace, cqlSessionProvider, schemaMetrics);
+                                     sidecarInternalKeyspace, cqlSessionProvider, schemaMetrics, null);
+        }
+
+        @Provides
+        @Singleton
+        public ClusterLease clusterLease()
+        {
+            return new ClusterLease(ClusterLease.Ownership.CLAIMED);
         }
     }
 }

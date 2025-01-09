@@ -71,12 +71,9 @@ public class GetPreemptiveOpenIntervalHandler extends AbstractHandler<DataStorag
                                   SocketAddress remoteAddress,
                                   DataStorageUnit unit)
     {
-        StorageOperations storageOperations = getStorageOperations(host);
-        logger.debug("Retrieving SSTable's preemptiveOpenInterval, unit={}, remoteAddress={}, instance={}",
-                     unit, remoteAddress, host);
-
+        StorageOperations operations = metadataFetcher.delegate(host).storageOperations();
         executorPools.service()
-                     .executeBlocking(() -> storageOperations.getSSTablePreemptiveOpenInterval(unit))
+                     .executeBlocking(() -> operations.getSSTablePreemptiveOpenInterval(unit))
                      .onSuccess(context::json)
                      .onFailure(cause -> processFailure(cause, context, host, remoteAddress, unit));
     }

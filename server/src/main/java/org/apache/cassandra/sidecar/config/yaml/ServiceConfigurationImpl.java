@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.cassandra.sidecar.common.DataObjectBuilder;
 import org.apache.cassandra.sidecar.config.CdcConfiguration;
+import org.apache.cassandra.sidecar.config.CoordinationConfiguration;
 import org.apache.cassandra.sidecar.config.JmxConfiguration;
 import org.apache.cassandra.sidecar.config.SSTableImportConfiguration;
 import org.apache.cassandra.sidecar.config.SSTableSnapshotConfiguration;
@@ -57,7 +58,11 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
     public static final String ALLOWABLE_SKEW_IN_MINUTES_PROPERTY = "allowable_time_skew_in_minutes";
     public static final int DEFAULT_ALLOWABLE_SKEW_IN_MINUTES = 60;
     private static final String SERVER_VERTICLE_INSTANCES_PROPERTY = "server_verticle_instances";
+    private static final String OPERATIONAL_JOB_TRACKER_SIZE_PROPERTY = "operations_job_tracker_size";
+    private static final String OPERATIONAL_JOB_EXECUTION_MAX_WAIT_TIME_MILLIS_PROPERTY = "operations_job_sync_response_timeout";
     private static final int DEFAULT_SERVER_VERTICLE_INSTANCES = 1;
+    private static final int DEFAULT_OPERATIONAL_JOB_TRACKER_SIZE = 64;
+    private static final long DEFAULT_OPERATIONAL_JOB_EXECUTION_MAX_WAIT_TIME_MILLIS = TimeUnit.SECONDS.toMillis(5);
     public static final String THROTTLE_PROPERTY = "throttle";
     public static final String SSTABLE_UPLOAD_PROPERTY = "sstable_upload";
     public static final String SSTABLE_IMPORT_PROPERTY = "sstable_import";
@@ -67,6 +72,7 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
     private static final String TRAFFIC_SHAPING_PROPERTY = "traffic_shaping";
     private static final String SCHEMA = "schema";
     private static final String CDC = "cdc";
+    private static final String COORDINATION = "coordination";
     protected static final Map<String, WorkerPoolConfiguration> DEFAULT_WORKER_POOLS_CONFIGURATION
     = Collections.unmodifiableMap(new HashMap<String, WorkerPoolConfiguration>()
     {{
@@ -102,6 +108,12 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
     @JsonProperty(value = SERVER_VERTICLE_INSTANCES_PROPERTY, defaultValue = DEFAULT_SERVER_VERTICLE_INSTANCES + "")
     protected final int serverVerticleInstances;
 
+    @JsonProperty(value = OPERATIONAL_JOB_TRACKER_SIZE_PROPERTY, defaultValue = DEFAULT_OPERATIONAL_JOB_TRACKER_SIZE + "")
+    protected final int operationalJobTrackerSize;
+
+    @JsonProperty(value = OPERATIONAL_JOB_EXECUTION_MAX_WAIT_TIME_MILLIS_PROPERTY)
+    protected final long operationalJobExecutionMaxWaitTimeMillis;
+
     @JsonProperty(value = THROTTLE_PROPERTY)
     protected final ThrottleConfiguration throttleConfiguration;
 
@@ -129,6 +141,9 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
     @JsonProperty(value = CDC)
     protected final CdcConfiguration cdcConfiguration;
 
+    @JsonProperty(value = COORDINATION)
+    protected final CoordinationConfiguration coordinationConfiguration;
+
     /**
      * Constructs a new {@link ServiceConfigurationImpl} with the default values
      */
@@ -152,6 +167,8 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         acceptBacklog = builder.acceptBacklog;
         allowableSkewInMinutes = builder.allowableSkewInMinutes;
         serverVerticleInstances = builder.serverVerticleInstances;
+        operationalJobTrackerSize = builder.operationalJobTrackerSize;
+        operationalJobExecutionMaxWaitTimeMillis = builder.operationalJobExecutionMaxWaitTimeMillis;
         throttleConfiguration = builder.throttleConfiguration;
         sstableUploadConfiguration = builder.sstableUploadConfiguration;
         sstableImportConfiguration = builder.sstableImportConfiguration;
@@ -161,6 +178,7 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         trafficShapingConfiguration = builder.trafficShapingConfiguration;
         schemaKeyspaceConfiguration = builder.schemaKeyspaceConfiguration;
         cdcConfiguration = builder.cdcConfiguration;
+        coordinationConfiguration = builder.coordinationConfiguration;
     }
 
     /**
@@ -241,6 +259,26 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
     public int serverVerticleInstances()
     {
         return serverVerticleInstances;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @JsonProperty(value = OPERATIONAL_JOB_TRACKER_SIZE_PROPERTY)
+    public int operationalJobTrackerSize()
+    {
+        return operationalJobTrackerSize;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @JsonProperty(value = OPERATIONAL_JOB_EXECUTION_MAX_WAIT_TIME_MILLIS_PROPERTY)
+    public long operationalJobExecutionMaxWaitTimeInMillis()
+    {
+        return operationalJobExecutionMaxWaitTimeMillis;
     }
 
     /**
@@ -334,6 +372,13 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         return cdcConfiguration;
     }
 
+    @Override
+    @JsonProperty(value = COORDINATION)
+    public CoordinationConfiguration coordinationConfiguration()
+    {
+        return coordinationConfiguration;
+    }
+
     public static Builder builder()
     {
         return new Builder();
@@ -352,6 +397,8 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         protected int acceptBacklog = DEFAULT_ACCEPT_BACKLOG;
         protected int allowableSkewInMinutes = DEFAULT_ALLOWABLE_SKEW_IN_MINUTES;
         protected int serverVerticleInstances = DEFAULT_SERVER_VERTICLE_INSTANCES;
+        protected int operationalJobTrackerSize = DEFAULT_OPERATIONAL_JOB_TRACKER_SIZE;
+        protected long operationalJobExecutionMaxWaitTimeMillis = DEFAULT_OPERATIONAL_JOB_EXECUTION_MAX_WAIT_TIME_MILLIS;
         protected ThrottleConfiguration throttleConfiguration = new ThrottleConfigurationImpl();
         protected SSTableUploadConfiguration sstableUploadConfiguration = new SSTableUploadConfigurationImpl();
         protected SSTableImportConfiguration sstableImportConfiguration = new SSTableImportConfigurationImpl();
@@ -362,6 +409,7 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         protected TrafficShapingConfiguration trafficShapingConfiguration = new TrafficShapingConfigurationImpl();
         protected SchemaKeyspaceConfiguration schemaKeyspaceConfiguration = new SchemaKeyspaceConfigurationImpl();
         protected CdcConfiguration cdcConfiguration = new CdcConfigurationImpl();
+        protected CoordinationConfiguration coordinationConfiguration = new CoordinationConfigurationImpl();
 
         private Builder()
         {
@@ -459,6 +507,29 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         public Builder serverVerticleInstances(int serverVerticleInstances)
         {
             return update(b -> b.serverVerticleInstances = serverVerticleInstances);
+        }
+
+        /**
+         * Sets the {@code operationalJobTrackerSize} and returns a reference to this Builder enabling method chaining.
+         *
+         * @param operationalJobTrackerSize the {@code operationalJobTrackerSize} to set
+         * @return a reference to this Builder
+         */
+        public Builder operationalJobTrackerSize(int operationalJobTrackerSize)
+        {
+            return update(b -> b.operationalJobTrackerSize = operationalJobTrackerSize);
+        }
+
+        /**
+         * Sets the {@code operationalJobExecutionMaxWaitTimeMillis} and returns a reference to this Builder
+         * enabling method chaining.
+         *
+         * @param operationalJobExecutionMaxWaitTimeMillis the {@code operationalJobExecutionMaxWaitTimeMillis} to set
+         * @return a reference to this Builder
+         */
+        public Builder operationalJobExecutionMaxWaitTimeMillis(int operationalJobExecutionMaxWaitTimeMillis)
+        {
+            return update(b -> b.operationalJobExecutionMaxWaitTimeMillis = operationalJobExecutionMaxWaitTimeMillis);
         }
 
         /**
@@ -562,6 +633,18 @@ public class ServiceConfigurationImpl implements ServiceConfiguration
         public Builder cdcConfiguration(CdcConfiguration configuration)
         {
             return update(b -> b.cdcConfiguration = configuration);
+        }
+
+        /**
+         * Sets the {@code coordinationConfiguration} and returns a reference to this Builder enabling method
+         * chaining.
+         *
+         * @param coordinationConfiguration the {@code coordinationConfiguration} to set
+         * @return a reference to this Builder
+         */
+        public Builder coordinationConfiguration(CoordinationConfiguration coordinationConfiguration)
+        {
+            return update(b -> b.coordinationConfiguration = coordinationConfiguration);
         }
 
         /**

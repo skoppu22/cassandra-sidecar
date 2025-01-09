@@ -56,8 +56,8 @@ import org.apache.cassandra.sidecar.adapters.base.CassandraFactory;
 import org.apache.cassandra.sidecar.adapters.cassandra41.Cassandra41Factory;
 import org.apache.cassandra.sidecar.cluster.CQLSessionProviderImpl;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
-import org.apache.cassandra.sidecar.cluster.InstancesConfigImpl;
+import org.apache.cassandra.sidecar.cluster.InstancesMetadata;
+import org.apache.cassandra.sidecar.cluster.InstancesMetadataImpl;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadataImpl;
 import org.apache.cassandra.sidecar.cluster.locator.CachedLocalTokenRanges;
@@ -80,10 +80,16 @@ import org.apache.cassandra.sidecar.config.SidecarConfiguration;
 import org.apache.cassandra.sidecar.config.VertxConfiguration;
 import org.apache.cassandra.sidecar.config.VertxMetricsConfiguration;
 import org.apache.cassandra.sidecar.config.yaml.SidecarConfigurationImpl;
+import org.apache.cassandra.sidecar.coordination.ClusterLease;
+import org.apache.cassandra.sidecar.coordination.ClusterLeaseClaimTask;
+import org.apache.cassandra.sidecar.coordination.ElectorateMembership;
+import org.apache.cassandra.sidecar.coordination.MostReplicatedKeyspaceTokenZeroElectorateMembership;
+import org.apache.cassandra.sidecar.db.SidecarLeaseDatabaseAccessor;
 import org.apache.cassandra.sidecar.db.schema.RestoreJobsSchema;
 import org.apache.cassandra.sidecar.db.schema.RestoreRangesSchema;
 import org.apache.cassandra.sidecar.db.schema.RestoreSlicesSchema;
 import org.apache.cassandra.sidecar.db.schema.SidecarInternalKeyspace;
+import org.apache.cassandra.sidecar.db.schema.SidecarLeaseSchema;
 import org.apache.cassandra.sidecar.db.schema.SidecarSchema;
 import org.apache.cassandra.sidecar.db.schema.SystemAuthSchema;
 import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
@@ -99,6 +105,8 @@ import org.apache.cassandra.sidecar.routes.DiskSpaceProtectionHandler;
 import org.apache.cassandra.sidecar.routes.FileStreamHandler;
 import org.apache.cassandra.sidecar.routes.GossipInfoHandler;
 import org.apache.cassandra.sidecar.routes.JsonErrorHandler;
+import org.apache.cassandra.sidecar.routes.ListOperationalJobsHandler;
+import org.apache.cassandra.sidecar.routes.OperationalJobHandler;
 import org.apache.cassandra.sidecar.routes.RingHandler;
 import org.apache.cassandra.sidecar.routes.RoutingOrder;
 import org.apache.cassandra.sidecar.routes.SchemaHandler;
@@ -123,6 +131,7 @@ import org.apache.cassandra.sidecar.routes.sstableuploads.SSTableCleanupHandler;
 import org.apache.cassandra.sidecar.routes.sstableuploads.SSTableImportHandler;
 import org.apache.cassandra.sidecar.routes.sstableuploads.SSTableUploadHandler;
 import org.apache.cassandra.sidecar.routes.validations.ValidateTableExistenceHandler;
+import org.apache.cassandra.sidecar.tasks.PeriodicTaskExecutor;
 import org.apache.cassandra.sidecar.utils.CassandraVersionProvider;
 import org.apache.cassandra.sidecar.utils.DigestAlgorithmProvider;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
@@ -133,6 +142,7 @@ import org.apache.cassandra.sidecar.utils.XXHash32Provider;
 import static org.apache.cassandra.sidecar.common.ApiEndpointsV1.API_V1_ALL_ROUTES;
 import static org.apache.cassandra.sidecar.common.server.utils.ByteUtils.bytesToHumanReadableBinaryPrefix;
 import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_SERVER_STOP;
+import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_SIDECAR_SCHEMA_INITIALIZED;
 
 /**
  * Provides main binding for more complex Guice dependencies
@@ -241,7 +251,6 @@ public class MainModule extends AbstractModule
     public Router vertxRouter(Vertx vertx,
                               SidecarConfiguration sidecarConfiguration,
                               ChainAuthHandler chainAuthHandler,
-                              ServiceConfiguration conf,
                               CassandraHealthHandler cassandraHealthHandler,
                               StreamSSTableComponentHandler streamSSTableComponentHandler,
                               FileStreamHandler fileStreamHandler,
@@ -271,13 +280,15 @@ public class MainModule extends AbstractModule
                               RestoreJobProgressHandler restoreJobProgressHandler,
                               ConnectedClientStatsHandler connectedClientStatsHandler,
                               GetPreemptiveOpenIntervalHandler getPreemptiveOpenIntervalHandler,
+                              OperationalJobHandler operationalJobHandler,
+                              ListOperationalJobsHandler listOperationalJobsHandler,
                               ErrorHandler errorHandler)
     {
         Router router = Router.router(vertx);
         router.route()
               .order(RoutingOrder.HIGHEST.order)
               .handler(loggerHandler)
-              .handler(TimeoutHandler.create(conf.requestTimeoutMillis(),
+              .handler(TimeoutHandler.create(sidecarConfiguration.serviceConfiguration().requestTimeoutMillis(),
                                              HttpResponseStatus.REQUEST_TIMEOUT.code()));
 
         // chain authentication before all requests
@@ -363,6 +374,12 @@ public class MainModule extends AbstractModule
 
         router.get(ApiEndpointsV1.CONNECTED_CLIENT_STATS_ROUTE)
               .handler(connectedClientStatsHandler);
+
+        router.get(ApiEndpointsV1.OPERATIONAL_JOB_ROUTE)
+              .handler(operationalJobHandler);
+
+        router.get(ApiEndpointsV1.LIST_OPERATIONAL_JOBS_ROUTE)
+              .handler(listOperationalJobsHandler);
 
         router.get(ApiEndpointsV1.RING_ROUTE_PER_KEYSPACE)
               .handler(ringHandler);
@@ -481,14 +498,14 @@ public class MainModule extends AbstractModule
 
     @Provides
     @Singleton
-    public InstancesConfig instancesConfig(Vertx vertx,
-                                           SidecarConfiguration configuration,
-                                           CassandraVersionProvider cassandraVersionProvider,
-                                           SidecarVersionProvider sidecarVersionProvider,
-                                           DnsResolver dnsResolver,
-                                           CQLSessionProvider cqlSessionProvider,
-                                           DriverUtils driverUtils,
-                                           MetricRegistryFactory registryProvider)
+    public InstancesMetadata instancesMetadata(Vertx vertx,
+                                               SidecarConfiguration configuration,
+                                               CassandraVersionProvider cassandraVersionProvider,
+                                               SidecarVersionProvider sidecarVersionProvider,
+                                               DnsResolver dnsResolver,
+                                               CQLSessionProvider cqlSessionProvider,
+                                               DriverUtils driverUtils,
+                                               MetricRegistryFactory registryProvider)
     {
         List<InstanceMetadata> instanceMetadataList =
         configuration.cassandraInstances()
@@ -506,7 +523,7 @@ public class MainModule extends AbstractModule
                      })
                      .collect(Collectors.toList());
 
-        return new InstancesConfigImpl(instanceMetadataList, dnsResolver);
+        return new InstancesMetadataImpl(instanceMetadataList, dnsResolver);
     }
 
     @Provides
@@ -618,7 +635,9 @@ public class MainModule extends AbstractModule
                                        RestoreSlicesSchema restoreSlicesSchema,
                                        RestoreRangesSchema restoreRangesSchema,
                                        SystemAuthSchema systemAuthSchema,
-                                       SidecarMetrics metrics)
+                                       SidecarLeaseSchema sidecarLeaseSchema,
+                                       SidecarMetrics metrics,
+                                       ClusterLease clusterLease)
     {
         SidecarInternalKeyspace sidecarInternalKeyspace = new SidecarInternalKeyspace(configuration);
         // register table schema when enabled
@@ -626,9 +645,10 @@ public class MainModule extends AbstractModule
         sidecarInternalKeyspace.registerTableSchema(restoreSlicesSchema);
         sidecarInternalKeyspace.registerTableSchema(restoreRangesSchema);
         sidecarInternalKeyspace.registerTableSchema(systemAuthSchema);
+        sidecarInternalKeyspace.registerTableSchema(sidecarLeaseSchema);
         SchemaMetrics schemaMetrics = metrics.server().schema();
         return new SidecarSchema(vertx, executorPools, configuration,
-                                 sidecarInternalKeyspace, cqlSessionProvider, schemaMetrics);
+                                 sidecarInternalKeyspace, cqlSessionProvider, schemaMetrics, clusterLease);
     }
 
     @Provides
@@ -659,9 +679,39 @@ public class MainModule extends AbstractModule
 
     @Provides
     @Singleton
-    public LocalTokenRangesProvider localTokenRangesProvider(InstancesConfig instancesConfig, DnsResolver dnsResolver)
+    public LocalTokenRangesProvider localTokenRangesProvider(InstancesMetadata instancesMetadata, DnsResolver dnsResolver)
     {
-        return new CachedLocalTokenRanges(instancesConfig, dnsResolver);
+        return new CachedLocalTokenRanges(instancesMetadata, dnsResolver);
+    }
+
+    @Provides
+    @Singleton
+    public ElectorateMembership electorateMembership(InstancesMetadata instancesMetadata,
+                                                     CQLSessionProvider cqlSessionProvider,
+                                                     SidecarConfiguration configuration)
+    {
+        return new MostReplicatedKeyspaceTokenZeroElectorateMembership(instancesMetadata, cqlSessionProvider, configuration);
+    }
+
+    @Provides
+    @Singleton
+    public ClusterLeaseClaimTask clusterLeaseClaimTask(Vertx vertx,
+                                                       ElectorateMembership electorateMembership,
+                                                       SidecarLeaseDatabaseAccessor accessor,
+                                                       ServiceConfiguration serviceConfiguration,
+                                                       PeriodicTaskExecutor periodicTaskExecutor,
+                                                       ClusterLease clusterLease,
+                                                       SidecarMetrics metrics)
+    {
+        ClusterLeaseClaimTask task = new ClusterLeaseClaimTask(vertx,
+                                                               serviceConfiguration,
+                                                               electorateMembership,
+                                                               accessor,
+                                                               clusterLease,
+                                                               metrics);
+        vertx.eventBus().localConsumer(ON_SIDECAR_SCHEMA_INITIALIZED.address(),
+                                       ignored -> periodicTaskExecutor.schedule(task));
+        return task;
     }
 
     /**

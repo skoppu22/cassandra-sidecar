@@ -19,12 +19,11 @@
 package org.apache.cassandra.sidecar.cluster.instance;
 
 import java.util.List;
-import java.util.function.Function;
 
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
+import org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException;
 import org.apache.cassandra.sidecar.metrics.instance.InstanceMetrics;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Metadata of an instance
@@ -62,26 +61,13 @@ public interface InstanceMetadata
     String cdcDir();
 
     /**
-     * @return a {@link CassandraAdapterDelegate} specific for the instance
+     * @return a {@link CassandraAdapterDelegate} specific for the instance, or throws when the delegate is unavailable
+     * @throws CassandraUnavailableException when the Cassandra service is unavailable
      */
-    @Nullable
-    CassandraAdapterDelegate delegate();
+    @NotNull CassandraAdapterDelegate delegate() throws CassandraUnavailableException;
 
     /**
      * @return {@link InstanceMetrics} metrics specific for the Cassandra instance
      */
     @NotNull InstanceMetrics metrics();
-
-    /**
-     * Get value from {@link CassandraAdapterDelegate}
-     * @param mapper the function is evaluated only when delegate is not null
-     * @return value retrieved from {@link CassandraAdapterDelegate} or null
-     * @param <T> value type
-     */
-    @Nullable
-    default <T> T applyFromDelegate(Function<CassandraAdapterDelegate, T> mapper)
-    {
-        CassandraAdapterDelegate delegate = delegate();
-        return delegate == null ? null : mapper.apply(delegate);
-    }
 }

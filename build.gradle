@@ -18,7 +18,7 @@
  */
 
 
-import com.github.spotbugs.SpotBugsTask
+import com.github.spotbugs.snom.SpotBugsTask
 import org.nosphere.apache.rat.RatTask
 
 import java.nio.file.Files
@@ -38,11 +38,11 @@ plugins {
     id 'application'
 
     // since we're using a specific version here, we delay applying the plugin till the all projects
-    id "com.github.spotbugs" version "3.0.0" apply false
+    id "com.github.spotbugs" version "6.0.20" apply false
 
     // https://github.com/nebula-plugins/gradle-ospackage-plugin/wiki
-    id "nebula.ospackage" version "8.3.0"
-    id 'nebula.ospackage-application' version "8.3.0"
+    id "com.netflix.nebula.ospackage" version "11.10.0"
+    id 'com.netflix.nebula.ospackage-application' version "11.10.0"
     id 'org.asciidoctor.jvm.convert' version '3.3.2'
 
     // Release Audit Tool (RAT) plugin for checking project licenses
@@ -75,11 +75,6 @@ allprojects {
         excludeFilter = file("${project.rootDir}/spotbugs-exclude.xml")
     }
 
-    tasks.withType(SpotBugsTask) {
-        reports.xml.enabled = false
-        reports.html.enabled = true
-    }
-
     codeCheckTasks.dependsOn(tasks.withType(Checkstyle))
     codeCheckTasks.dependsOn(tasks.withType(RatTask))
     codeCheckTasks.dependsOn(tasks.withType(SpotBugsTask))
@@ -102,23 +97,40 @@ application {
     // Take the application out once we're running via Cassandra
     mainClassName = "org.apache.cassandra.sidecar.CassandraSidecarDaemon"
     applicationName = 'cassandra-sidecar'
-    // Config file location should be in file:/// format for local files,
-    def confFile = "file:" + File.separator + File.separator + "APP_HOME_TO_REPLACE/conf/sidecar.yaml"
-    applicationDefaultJvmArgs = ["-Dsidecar.logdir=./logs",
-                                 "-Dsidecar.config=" + confFile,
-                                 "-Dlogback.configurationFile=./conf/logback.xml",
-                                 "-Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.SLF4JLogDelegateFactory",
-                                 "-javaagent:APP_HOME_TO_REPLACE/agents/jolokia-jvm-1.6.0-agent.jar=port=7777,host=localhost"]
+    applicationDefaultJvmArgs = ["PLACEHOLDER"]
 }
 
 startScripts {
     doLast {
-        unixScript.text = unixScript.text.replace("APP_HOME_TO_REPLACE", "\${APP_HOME}")
+        // Config file location should be in file:/// format for local files,
+        def confFile = "file:" + File.separator + File.separator + "\${APP_HOME}/conf/sidecar.yaml"
+
+        // As of Gradle version 7.2, the generated bin/cassandra-sidecar file by default is configured to not allow
+        // shell fragments. Thus, variables like APP_HOME are treated as literals, which prevents us from being able to
+        // start up cassandra-sidecar. See this comment on bin/cassandra-sidecar (line 208):
+        //
+        // # Collect all arguments for the java command:
+        // #   * DEFAULT_JVM_OPTS, JAVA_OPTS, JAVA_OPTS, and optsEnvironmentVar are not allowed to contain shell fragments,
+        // #     and any embedded shellness will be escaped.
+        // #   * For example: A user cannot expect ${Hostname} to be expanded, as it is an environment variable and will be
+        // #     treated as '${Hostname}' itself on the command line.
+        //
+        // Replacing the placeholder after the script has been generated will preserve the semantics from Gradle < 7.2.
+        // See this Gradle issue for more context: https://github.com/gradle/gradle/issues/18170.
+
+        def defaultJvmOpts = ["-Dsidecar.logdir=./logs",
+                              "-Dsidecar.config=" + confFile,
+                              "-Dlogback.configurationFile=./conf/logback.xml",
+                              "-Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.SLF4JLogDelegateFactory",
+                              "-javaagent:\${APP_HOME}/agents/jolokia-jvm-1.6.0-agent.jar=port=7777,host=localhost"]
+        unixScript.text = unixScript.text.replace("DEFAULT_JVM_OPTS='\"PLACEHOLDER\"'",
+                "DEFAULT_JVM_OPTS=\"${defaultJvmOpts.join(" ")}\"")
+        windowsScript.delete()
     }
 }
 
 run {
-    def confFile = "file:" + File.separator + File.separator + "$projectDir/conf/sidecar.yaml"
+    def confFile = System.getProperty("sidecar.config", "file:" + File.separator + File.separator + "$projectDir/conf/sidecar.yaml")
     println "Sidecar configuration file $confFile"
     jvmArgs = ["-Dsidecar.logdir=./logs",
                "-Dsidecar.config=" + confFile,
@@ -131,7 +143,15 @@ distributions {
     main {
         contents {
             from 'LICENSE.txt'
-            from 'server/src/main/dist'
+            // Include the "agents" directory in the distribution
+            from('agents') {
+                into('agents')
+            }
+            // Include the "conf" directory in the distribution
+            from('conf') {
+                into('conf')
+            }
+            setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
         }
     }
 }
@@ -171,34 +191,33 @@ tasks.named('idea').configure {
     dependsOn copyIdeaSettings
 }
 
-// Lets copy the distributions from build/install directory to /bin and /lib
-// directories to be aligned with C* distribution format
-tasks.register('copyDist', Copy) {
-    from "$buildDir/install/$applicationName"
-    into "$projectDir"
-}
-
-tasks.register('copyJolokia', Copy) {
-    from configurations.jolokia
-    into "$projectDir/src/main/dist/agents"
+tasks.register('copyJolokia') {
+    doLast {
+        copy {
+            into "$projectDir"
+            into("agents") {
+                from configurations.jolokia
+            }
+        }
+    }
 }
 
 // Lets clean distribution directories along with default build directories.
 clean.doLast {
-    ["agents", "bin", "conf", "lib"].each {
+    ["agents"].each {
         println "Deleting directory $projectDir/$it"
         delete "$projectDir/$it"
     }
-    println "Deleting generated docs $projectDir/src/main/resources/docs"
-    delete "$projectDir/src/main/resources/docs"
+    println "Deleting generated docs $projectDir/server/src/main/resources/docs"
+    delete "$projectDir/server/src/main/resources/docs"
 }
 
 subprojects {
     jacocoTestReport {
         reports {
-            xml.enabled true
-            html.enabled true
-            csv.enabled false
+            xml.setRequired(true)
+            html.setRequired(true)
+            csv.setRequired(false)
         }
     }
 
@@ -287,10 +306,9 @@ rat {
     reportDir.set(file("build/reports/rat"))
 }
 
-// copyDist gets called on every build
-copyDist.dependsOn installDist, copyJolokia
+installDist.dependsOn copyJolokia
 check.dependsOn codeCheckTasks
-build.dependsOn copyDist, copyJolokia, copyDocs
+build.dependsOn copyJolokia, copyDocs
 run.dependsOn build
 
 tasks.named('rat').configure {

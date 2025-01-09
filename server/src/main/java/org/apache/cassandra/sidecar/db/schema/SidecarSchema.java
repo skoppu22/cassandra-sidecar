@@ -31,6 +31,9 @@ import org.apache.cassandra.sidecar.common.server.CQLSessionProvider;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.config.SchemaKeyspaceConfiguration;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
+import org.apache.cassandra.sidecar.coordination.ClusterLease;
+import org.apache.cassandra.sidecar.coordination.ExecuteOnClusterLeaseholderOnly;
+import org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException;
 import org.apache.cassandra.sidecar.exceptions.SidecarSchemaModificationException;
 import org.apache.cassandra.sidecar.metrics.SchemaMetrics;
 
@@ -53,6 +56,7 @@ public class SidecarSchema
     private final AtomicLong initializationTimerId = new AtomicLong(-1L);
     private final CQLSessionProvider cqlSessionProvider;
     private final SchemaMetrics metrics;
+    private final ClusterLease clusterLease;
 
     private boolean isInitialized = false;
 
@@ -61,7 +65,8 @@ public class SidecarSchema
                          SidecarConfiguration config,
                          SidecarInternalKeyspace sidecarInternalKeyspace,
                          CQLSessionProvider cqlSessionProvider,
-                         SchemaMetrics metrics)
+                         SchemaMetrics metrics,
+                         ClusterLease clusterLease)
     {
         this.vertx = vertx;
         this.executorPools = executorPools;
@@ -69,6 +74,7 @@ public class SidecarSchema
         this.sidecarInternalKeyspace = sidecarInternalKeyspace;
         this.cqlSessionProvider = cqlSessionProvider;
         this.metrics = metrics;
+        this.clusterLease = clusterLease;
         if (this.schemaKeyspaceConfiguration.isEnabled())
         {
             configureSidecarServerEventListeners();
@@ -136,16 +142,10 @@ public class SidecarSchema
             return;
         }
 
-        Session session = cqlSessionProvider.get();
-        if (session == null)
-        {
-            LOGGER.debug("Cql session is not yet available. Skip initializing...");
-            return;
-        }
-
         try
         {
-            isInitialized = sidecarInternalKeyspace.initialize(session);
+            Session session = cqlSessionProvider.get();
+            isInitialized = sidecarInternalKeyspace.initialize(session, this::shouldCreateSchema);
 
             if (isInitialized())
             {
@@ -153,6 +153,10 @@ public class SidecarSchema
                 cancelTimer(timerId);
                 reportSidecarSchemaInitialized();
             }
+        }
+        catch (CassandraUnavailableException ignored)
+        {
+            LOGGER.debug("Cql session is not yet available. Skip initializing...");
         }
         catch (Exception ex)
         {
@@ -180,5 +184,23 @@ public class SidecarSchema
     protected void reportSidecarSchemaInitialized()
     {
         vertx.eventBus().publish(ON_SIDECAR_SCHEMA_INITIALIZED.address(), "SidecarSchema initialized");
+    }
+
+    /**
+     * Returns {@code true} when the schema should be created by this Sidecar instance. For schemas
+     * of type {@link ExecuteOnClusterLeaseholderOnly}, the schema creation is conditioned to whether
+     * the local Sidecar instance has claimed the cluster-wide lease. For all other types of schemas,
+     * the schemas will be created.
+     *
+     * @param schema the schema to test
+     * @return {@code true} if the schema should be created by this Sidecar instance, {@code false} otherwise
+     */
+    protected boolean shouldCreateSchema(AbstractSchema schema)
+    {
+        if (schema instanceof ExecuteOnClusterLeaseholderOnly)
+        {
+            return clusterLease.isClaimedByLocalSidecar();
+        }
+        return true;
     }
 }

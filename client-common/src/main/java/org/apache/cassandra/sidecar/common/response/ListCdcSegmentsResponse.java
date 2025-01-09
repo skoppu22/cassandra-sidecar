@@ -20,6 +20,7 @@ package org.apache.cassandra.sidecar.common.response;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -36,16 +37,16 @@ public class ListCdcSegmentsResponse
 {
     private final String host;
     private final int port;
-    private final List<CdcSegmentInfo> segmentInfos;
+    private final List<CdcSegmentInfo> segmentsInfo;
 
     @JsonCreator
     public ListCdcSegmentsResponse(@JsonProperty("host") String host,
                                    @JsonProperty("port") int port,
-                                   @JsonProperty("segmentInfos") List<CdcSegmentInfo> segmentsInfo)
+                                   @JsonProperty("segmentsInfo") List<CdcSegmentInfo> segmentsInfo)
     {
         this.host = host;
         this.port = port;
-        this.segmentInfos = Collections.unmodifiableList(segmentsInfo);
+        this.segmentsInfo = segmentsInfo == null ? Collections.emptyList() : Collections.unmodifiableList(segmentsInfo);
     }
 
     @JsonProperty("host")
@@ -60,9 +61,30 @@ public class ListCdcSegmentsResponse
         return port;
     }
 
-    @JsonProperty("segmentInfos")
-    public List<CdcSegmentInfo> segmentInfos()
+    @JsonProperty("segmentsInfo")
+    public List<CdcSegmentInfo> segmentsInfo()
     {
-        return segmentInfos;
+        return segmentsInfo;
+    }
+
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o)
+        {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass())
+        {
+            return false;
+        }
+        ListCdcSegmentsResponse that = (ListCdcSegmentsResponse) o;
+        return port == that.port && Objects.equals(host, that.host) && Objects.equals(segmentsInfo, that.segmentsInfo);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(host, port, segmentsInfo);
     }
 }

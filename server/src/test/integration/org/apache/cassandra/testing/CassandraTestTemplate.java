@@ -150,9 +150,7 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
 
         private BeforeEachCallback beforeEach()
         {
-            Predicate<String> extra = c -> {
-                return c.contains("BBHelper") || c.contains("BootstrapState");
-            };
+            Predicate<String> extra = c -> c.contains("BBHelper") || c.contains("BootstrapState");
             return beforeEachCtx -> {
                 CassandraIntegrationTest annotation = getCassandraIntegrationTestAnnotation(context, true);
                 // spin up a C* cluster using the in-jvm dtest
@@ -332,7 +330,7 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
 
     public static UpgradeableCluster retriableStartCluster(UpgradeableCluster.Builder builder, int maxAttempts)
     {
-        Throwable lastCuase = null;
+        Throwable lastCause = null;
         for (int i = 0; i < maxAttempts; i++)
         {
             try
@@ -345,7 +343,7 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
                 if (addressAlreadyInUse)
                 {
                     LOGGER.warn("Failed to provision cluster due to port collision after {} retries", i, cause);
-                    lastCuase = cause;
+                    lastCause = cause;
                 }
                 else
                 {
@@ -354,7 +352,7 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
             }
         }
 
-        throw new RuntimeException("Failed to providiosn cluster after exhausting all attempts", lastCuase);
+        throw new RuntimeException("Failed to providiosn cluster after exhausting all attempts", lastCause);
     }
 
     private static boolean portNotAvailableToBind(Throwable cause)

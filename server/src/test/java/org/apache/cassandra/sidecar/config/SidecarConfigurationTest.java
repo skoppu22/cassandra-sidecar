@@ -223,6 +223,7 @@ class SidecarConfigurationTest
         assertThat(configuration.replicationFactor()).isEqualTo(3);
         assertThat(configuration.createReplicationStrategyString())
         .isEqualTo("{'class':'SimpleStrategy', 'replication_factor':'3'}");
+        assertThat(configuration.leaseSchemaTTLSeconds()).isEqualTo(120);
     }
 
     @Test
@@ -341,6 +342,22 @@ class SidecarConfigurationTest
         assertThat(permissionCacheConfiguration.maximumSize()).isEqualTo(1000);
         assertThat(permissionCacheConfiguration.warmupRetries()).isEqualTo(5);
         assertThat(permissionCacheConfiguration.warmupRetryIntervalMillis()).isEqualTo(2000);
+    }
+
+    @Test
+    void testCoordinationConfiguration() throws Exception
+    {
+        Path yamlPath = yaml("config/sidecar_coordination.yaml");
+        SidecarConfiguration config = SidecarConfigurationImpl.readYamlConfiguration(yamlPath);
+        ServiceConfiguration serviceConfiguration = config.serviceConfiguration();
+        assertThat(serviceConfiguration).isNotNull();
+
+        CoordinationConfiguration coordinationConfiguration = serviceConfiguration.coordinationConfiguration();
+        assertThat(coordinationConfiguration).isNotNull();
+        PeriodicTaskConfiguration periodicTaskConfig = coordinationConfiguration.clusterLeaseClaimConfiguration();
+        assertThat(periodicTaskConfig.enabled()).isFalse();
+        assertThat(periodicTaskConfig.initialDelayMillis()).isEqualTo(5_000L);
+        assertThat(periodicTaskConfig.executeIntervalMillis()).isEqualTo(31_000L);
     }
 
     void validateSingleInstanceSidecarConfiguration(SidecarConfiguration config)
@@ -479,6 +496,14 @@ class SidecarConfigurationTest
         assertThat(snapshotConfig.snapshotListCacheConfiguration().enabled()).isTrue();
         assertThat(snapshotConfig.snapshotListCacheConfiguration().maximumSize()).isEqualTo(450);
         assertThat(snapshotConfig.snapshotListCacheConfiguration().expireAfterAccessMillis()).isEqualTo(350);
+
+        // Validate default configuration
+        CoordinationConfiguration coordinationConfiguration = serviceConfiguration.coordinationConfiguration();
+        assertThat(coordinationConfiguration).isNotNull();
+        PeriodicTaskConfiguration periodicTaskConfig = coordinationConfiguration.clusterLeaseClaimConfiguration();
+        assertThat(periodicTaskConfig.enabled()).isTrue();
+        assertThat(periodicTaskConfig.executeIntervalMillis()).isEqualTo(60_000L);
+        assertThat(periodicTaskConfig.initialDelayMillis()).isEqualTo(1_000L);
     }
 
     private void validateHealthCheckConfigurationFromYaml(HealthCheckConfiguration config)
@@ -497,7 +522,8 @@ class SidecarConfigurationTest
                                                                           "system",
                                                                           "system_auth",
                                                                           "system_views",
-                                                                          "system_virtual_schema");
+                                                                          "system_virtual_schema",
+                                                                          "sidecar_internal");
         assertThat(config.allowedPatternForName()).isEqualTo("[a-zA-Z][a-zA-Z0-9_]{0,47}");
         assertThat(config.allowedPatternForQuotedName()).isEqualTo("[a-zA-Z_0-9]{1,48}");
         assertThat(config.allowedPatternForComponentName())

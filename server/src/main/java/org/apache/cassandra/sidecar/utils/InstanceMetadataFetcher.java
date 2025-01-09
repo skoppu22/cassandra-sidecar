@@ -24,8 +24,11 @@ import java.util.concurrent.ThreadLocalRandom;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
+import org.apache.cassandra.sidecar.cluster.InstancesMetadata;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
+import org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException;
+import org.apache.cassandra.sidecar.exceptions.NoSuchSidecarInstanceException;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -34,12 +37,12 @@ import org.jetbrains.annotations.Nullable;
 @Singleton
 public class InstanceMetadataFetcher
 {
-    private final InstancesConfig instancesConfig;
+    private final InstancesMetadata instancesMetadata;
 
     @Inject
-    public InstanceMetadataFetcher(InstancesConfig instancesConfig)
+    public InstanceMetadataFetcher(InstancesMetadata instancesMetadata)
     {
-        this.instancesConfig = instancesConfig;
+        this.instancesMetadata = instancesMetadata;
     }
 
     /**
@@ -50,11 +53,12 @@ public class InstanceMetadataFetcher
      * @return the {@link InstanceMetadata} for the given {@code host}, or the first instance when {@code host} is
      * {@code null}
      */
-    public InstanceMetadata instance(@Nullable String host)
+    @NotNull
+    public InstanceMetadata instance(@Nullable String host) throws NoSuchSidecarInstanceException
     {
         return host == null
                ? firstInstance()
-               : instancesConfig.instanceFromHost(host);
+               : instancesMetadata.instanceFromHost(host);
     }
 
     /**
@@ -64,10 +68,12 @@ public class InstanceMetadataFetcher
      * @param instanceId the identifier for the Cassandra instance
      * @return the {@link InstanceMetadata} for the given {@code instanceId}, or the first instance when
      * {@code instanceId} is {@code null}
+     * @throws NoSuchSidecarInstanceException when the Cassandra instance with {@code instanceId} does not exist
      */
-    public InstanceMetadata instance(int instanceId)
+    @NotNull
+    public InstanceMetadata instance(int instanceId) throws NoSuchSidecarInstanceException
     {
-        return instancesConfig.instanceFromId(instanceId);
+        return instancesMetadata.instanceFromId(instanceId);
     }
 
     /**
@@ -77,9 +83,11 @@ public class InstanceMetadataFetcher
      * @param host the Cassandra instance host
      * @return the {@link CassandraAdapterDelegate} for the given {@code host}, or the first instance when {@code host}
      * is {@code null}
+     * @throws NoSuchSidecarInstanceException when the Cassandra instance with {@code host} does not exist
+     * @throws CassandraUnavailableException  when Cassandra is not yet connected
      */
-    @Nullable
-    public CassandraAdapterDelegate delegate(String host)
+    @NotNull
+    public CassandraAdapterDelegate delegate(@Nullable String host) throws NoSuchSidecarInstanceException, CassandraUnavailableException
     {
         return instance(host).delegate();
     }
@@ -88,10 +96,12 @@ public class InstanceMetadataFetcher
      * Returns the {@link CassandraAdapterDelegate} for the given {@code instanceId}
      *
      * @param instanceId the identifier for the Cassandra instance
-     * @return the {@link CassandraAdapterDelegate} for the given {@code instanceId}, or the first instance when
-     * {@code instanceId} is {@code null}
+     * @return the {@link CassandraAdapterDelegate} for the given {@code instanceId}
+     * @throws NoSuchSidecarInstanceException when the Cassandra instance with {@code instanceId} does not exist
+     * @throws CassandraUnavailableException  when Cassandra is not yet connected
      */
-    public CassandraAdapterDelegate delegate(int instanceId)
+    @NotNull
+    public CassandraAdapterDelegate delegate(int instanceId) throws NoSuchSidecarInstanceException, CassandraUnavailableException
     {
         return instance(instanceId).delegate();
     }
@@ -102,8 +112,8 @@ public class InstanceMetadataFetcher
      */
     public InstanceMetadata firstInstance()
     {
-        ensureInstancesConfigured();
-        return instancesConfig.instances().get(0);
+        ensureInstancesMetadataConfigured();
+        return instancesMetadata.instances().get(0);
     }
 
     /**
@@ -112,8 +122,8 @@ public class InstanceMetadataFetcher
      */
     public InstanceMetadata anyInstance()
     {
-        ensureInstancesConfigured();
-        List<InstanceMetadata> instances = instancesConfig.instances();
+        ensureInstancesMetadataConfigured();
+        List<InstanceMetadata> instances = instancesMetadata.instances();
         if (instances.size() == 1)
         {
             return instances.get(0);
@@ -123,9 +133,9 @@ public class InstanceMetadataFetcher
         return instances.get(randomPick);
     }
 
-    private void ensureInstancesConfigured()
+    private void ensureInstancesMetadataConfigured()
     {
-        if (instancesConfig.instances().isEmpty())
+        if (instancesMetadata.instances().isEmpty())
         {
             throw new IllegalStateException("There are no instances configured!");
         }

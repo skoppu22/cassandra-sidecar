@@ -39,8 +39,10 @@ import org.apache.cassandra.sidecar.common.request.AbortRestoreJobRequest;
 import org.apache.cassandra.sidecar.common.request.CreateRestoreJobRequest;
 import org.apache.cassandra.sidecar.common.request.CreateRestoreJobSliceRequest;
 import org.apache.cassandra.sidecar.common.request.ImportSSTableRequest;
+import org.apache.cassandra.sidecar.common.request.ListCdcSegmentsRequest;
 import org.apache.cassandra.sidecar.common.request.RestoreJobProgressRequest;
 import org.apache.cassandra.sidecar.common.request.RestoreJobSummaryRequest;
+import org.apache.cassandra.sidecar.common.request.StreamCdcSegmentRequest;
 import org.apache.cassandra.sidecar.common.request.UpdateRestoreJobRequest;
 import org.apache.cassandra.sidecar.common.request.data.AbortRestoreJobRequestPayload;
 import org.apache.cassandra.sidecar.common.request.data.CreateRestoreJobRequestPayload;
@@ -52,8 +54,11 @@ import org.apache.cassandra.sidecar.common.response.ConnectedClientStatsResponse
 import org.apache.cassandra.sidecar.common.response.GetPreemptiveOpenIntervalResponse;
 import org.apache.cassandra.sidecar.common.response.GossipInfoResponse;
 import org.apache.cassandra.sidecar.common.response.HealthResponse;
+import org.apache.cassandra.sidecar.common.response.ListCdcSegmentsResponse;
+import org.apache.cassandra.sidecar.common.response.ListOperationalJobsResponse;
 import org.apache.cassandra.sidecar.common.response.ListSnapshotFilesResponse;
 import org.apache.cassandra.sidecar.common.response.NodeSettings;
+import org.apache.cassandra.sidecar.common.response.OperationalJobResponse;
 import org.apache.cassandra.sidecar.common.response.RingResponse;
 import org.apache.cassandra.sidecar.common.response.SSTableImportResponse;
 import org.apache.cassandra.sidecar.common.response.SchemaResponse;
@@ -491,6 +496,41 @@ public class SidecarClient implements AutoCloseable, SidecarClientBlobRestoreExt
     }
 
     /**
+     * Lists CDC commit logs in CDC directory for an instance
+     * @param sidecarInstance instance on which the CDC commit logs are to be listed
+     * @return a completable future with List of cdc commitLogs on the requested instance
+     */
+    public CompletableFuture<ListCdcSegmentsResponse> listCdcSegments(SidecarInstance sidecarInstance)
+    {
+        return executor.executeRequestAsync(requestBuilder()
+                       .singleInstanceSelectionPolicy(sidecarInstance)
+                       .request(new ListCdcSegmentsRequest())
+                       .build());
+    }
+
+    /**
+     * Streams CDC commit log segments from the requested instance.
+     *
+     * Streams the specified {@code range} of a CDC CommitLog from the given instance and the
+     * stream is consumed by the {@link StreamConsumer consumer}.
+     *
+     * @param sidecarInstance instance on which the CDC commit logs are to be streamed
+     * @param segment segment file name
+     * @param range range of the file to be streamed
+     * @param streamConsumer object that consumes the stream
+     */
+    public void streamCdcSegments(SidecarInstance sidecarInstance,
+                                  String segment,
+                                  HttpRange range,
+                                  StreamConsumer streamConsumer)
+    {
+        executor.streamRequest(requestBuilder()
+                .singleInstanceSelectionPolicy(sidecarInstance)
+                .request(new StreamCdcSegmentRequest(segment, range))
+                .build(), streamConsumer);
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
@@ -583,15 +623,46 @@ public class SidecarClient implements AutoCloseable, SidecarClientBlobRestoreExt
     }
 
     /**
-     * Executes the connected client stats request using the default retry policy and configured selection policy
+     * Executes the connected client stats request using the default retry policy and provided {@code instance}.
      *
+     * @param instance the instance where the request will be executed
      * @return a completable future of the connected client stats
      */
-    public CompletableFuture<ConnectedClientStatsResponse> connectedClientStats()
+    public CompletableFuture<ConnectedClientStatsResponse> connectedClientStats(SidecarInstance instance)
     {
-        return executeRequestAsync(requestBuilder()
-                                   .connectedClientStatsRequest()
-                                   .build());
+        return executor.executeRequestAsync(requestBuilder()
+                                            .singleInstanceSelectionPolicy(instance)
+                                            .connectedClientStatsRequest()
+                                            .build());
+    }
+
+    /**
+     * Executes the operational job request using the default retry policy and provided {@code instance}.
+     *
+     * @param instance the instance where the request will be executed
+     * @param jobId    the unique operational job identifier
+     * @return a completable future of the operational job response
+     */
+    public CompletableFuture<OperationalJobResponse> operationalJobs(SidecarInstance instance, UUID jobId)
+    {
+        return executor.executeRequestAsync(requestBuilder()
+                                            .singleInstanceSelectionPolicy(instance)
+                                            .operationalJobRequest(jobId)
+                                            .build());
+    }
+
+    /**
+     * Executes the list operational jobs request using the default retry policy and provided {@code instance}.
+     *
+     * @param instance the instance where the request will be executed
+     * @return a completable future of the list of operational jobs
+     */
+    public CompletableFuture<ListOperationalJobsResponse> listOperationalJobs(SidecarInstance instance)
+    {
+        return executor.executeRequestAsync(requestBuilder()
+                                            .singleInstanceSelectionPolicy(instance)
+                                            .listOperationalJobsRequest()
+                                            .build());
     }
 
     /**

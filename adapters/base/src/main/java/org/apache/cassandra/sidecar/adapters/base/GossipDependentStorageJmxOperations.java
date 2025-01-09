@@ -157,7 +157,7 @@ public class GossipDependentStorageJmxOperations implements StorageJmxOperations
             return;
 
         LOGGER.warn("Gossip is disabled and unavailable for the operation");
-        throw OperationUnavailableException.GOSSIP_DISABLED;
+        throw new OperationUnavailableException("Gossip is required for the operation but it is disabled");
     }
 
     @Override

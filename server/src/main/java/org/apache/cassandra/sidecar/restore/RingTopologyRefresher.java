@@ -40,7 +40,9 @@ import org.apache.cassandra.sidecar.common.server.data.Name;
 import org.apache.cassandra.sidecar.config.RestoreJobConfiguration;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
 import org.apache.cassandra.sidecar.db.RestoreJob;
+import org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException;
 import org.apache.cassandra.sidecar.tasks.PeriodicTask;
+import org.apache.cassandra.sidecar.tasks.ScheduleDecision;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
@@ -73,9 +75,9 @@ public class RingTopologyRefresher implements PeriodicTask
     }
 
     @Override
-    public boolean shouldSkip()
+    public ScheduleDecision scheduleDecision()
     {
-        return replicaByTokenRangePerKeyspace.isEmpty();
+        return replicaByTokenRangePerKeyspace.isEmpty() ? ScheduleDecision.SKIP : ScheduleDecision.EXECUTE;
     }
 
     @Override
@@ -121,10 +123,16 @@ public class RingTopologyRefresher implements PeriodicTask
 
     private void executeBlocking()
     {
-        CassandraAdapterDelegate delegate = metadataFetcher.anyInstance().delegate();
-        StorageOperations storageOperations = delegate == null ? null : delegate.storageOperations();
-        NodeSettings nodeSettings = delegate == null ? null : delegate.nodeSettings();
-        if (storageOperations == null || nodeSettings == null)
+        CassandraAdapterDelegate delegate;
+        StorageOperations storageOperations;
+        NodeSettings nodeSettings;
+        try
+        {
+            delegate = metadataFetcher.anyInstance().delegate();
+            storageOperations = delegate.storageOperations();
+            nodeSettings = delegate.nodeSettings();
+        }
+        catch (CassandraUnavailableException ignored)
         {
             LOGGER.debug("Not yet connect to Cassandra");
             return;

@@ -58,9 +58,13 @@ import org.apache.cassandra.sidecar.config.DriverConfiguration;
 import org.apache.cassandra.sidecar.config.KeyStoreConfiguration;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
 import org.apache.cassandra.sidecar.config.SslConfiguration;
+import org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException;
 import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.VisibleForTesting;
+
+import static org.apache.cassandra.sidecar.exceptions.CassandraUnavailableException.Service.CQL;
 
 /**
  * Provides connections to the local Cassandra cluster as defined in the Configuration. Currently, it only supports
@@ -70,7 +74,7 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
 {
     private static final Logger logger = LoggerFactory.getLogger(CQLSessionProviderImpl.class);
     private final List<InetSocketAddress> contactPoints;
-    private final int numConnections;
+    private final int numAdditionalConnections;
     private final String localDc;
     private final SslConfiguration sslConfiguration;
     private final NettyOptions nettyOptions;
@@ -79,7 +83,6 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
     private final String username;
     private final String password;
     private final DriverUtils driverUtils;
-    @Nullable
     private volatile Session session;
 
     @VisibleForTesting
@@ -87,7 +90,26 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
                                   List<InetSocketAddress> localInstances,
                                   int healthCheckFrequencyMillis,
                                   String localDc,
-                                  int numConnections,
+                                  int numAdditionalConnections,
+                                  NettyOptions options)
+    {
+        this(contactPoints,
+             localInstances,
+             healthCheckFrequencyMillis,
+             localDc,
+             numAdditionalConnections,
+             null,
+             null,
+             null,
+             options);
+    }
+
+    @VisibleForTesting
+    public CQLSessionProviderImpl(List<InetSocketAddress> contactPoints,
+                                  List<InetSocketAddress> localInstances,
+                                  int healthCheckFrequencyMillis,
+                                  String localDc,
+                                  int numAdditionalConnections,
                                   String username,
                                   String password,
                                   SslConfiguration sslConfiguration,
@@ -96,7 +118,7 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
         this.contactPoints = contactPoints;
         this.localInstances = localInstances;
         this.localDc = localDc;
-        this.numConnections = numConnections;
+        this.numAdditionalConnections = numAdditionalConnections;
         this.username = username;
         this.password = password;
         this.sslConfiguration = sslConfiguration;
@@ -120,7 +142,7 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
         this.username = driverConfiguration.username();
         this.password = driverConfiguration.password();
         this.sslConfiguration = driverConfiguration.sslConfiguration();
-        this.numConnections = driverConfiguration.numConnections();
+        this.numAdditionalConnections = driverConfiguration.numConnections();
         this.nettyOptions = options;
         int maxDelayMs = configuration.healthCheckConfiguration().checkIntervalMillis();
         this.reconnectionPolicy = new ExponentialReconnectionPolicy(500, maxDelayMs);
@@ -150,19 +172,20 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
      * @return Session
      */
     @Override
-    @Nullable
-    public synchronized Session get()
+    @NotNull
+    public synchronized Session get() throws CassandraUnavailableException
     {
         if (session != null)
         {
             return session;
         }
+
         Cluster cluster = null;
         try
         {
             logger.info("Connecting to cluster using contact points {}", contactPoints);
 
-            LoadBalancingPolicy lbp = new SidecarLoadBalancingPolicy(localInstances, localDc, numConnections,
+            LoadBalancingPolicy lbp = new SidecarLoadBalancingPolicy(localInstances, localDc, numAdditionalConnections,
                                                                      driverUtils);
             // Prevent spurious reconnects of ignored down nodes on `onUp` events
             QueryOptions queryOptions = new QueryOptions().setReprepareOnUp(false);
@@ -192,7 +215,7 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
             // During mTLS connections, when client sends in keystore, we should have an AuthProvider passed along.
             // hence we pass empty username and password in PlainTextAuthProvider here, in case user hasn't already
             // configured username and password.
-            else if (sslConfiguration.isKeystoreConfigured())
+            else if (sslConfiguration != null && sslConfiguration.isKeystoreConfigured())
             {
                 builder.withAuthProvider(new PlainTextAuthProvider("", ""));
             }
@@ -200,26 +223,29 @@ public class CQLSessionProviderImpl implements CQLSessionProvider
             cluster = builder.build();
             session = cluster.connect();
             logger.info("Successfully connected to Cassandra!");
+            return session;
         }
-        catch (Exception e)
+        catch (Exception connectionException)
         {
-            logger.error("Failed to reach Cassandra", e);
+            logger.error("Failed to reach Cassandra", connectionException);
             if (cluster != null)
             {
                 try
                 {
                     cluster.close();
                 }
-                catch (Exception ex)
+                catch (Exception closeException)
                 {
-                    logger.error("Failed to close cluster in cleanup", ex);
+                    logger.error("Failed to close cluster in cleanup", closeException);
+                    connectionException.addSuppressed(closeException);
                 }
             }
+            throw new CassandraUnavailableException(CQL, connectionException);
         }
-        return session;
     }
 
     @Override
+    @Nullable
     public Session getIfConnected()
     {
         return session;
