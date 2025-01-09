@@ -59,13 +59,13 @@ public class GossipStatusHandlerIntegrationTest extends IntegrationTestBase
 
         getGossipStatus()
         .compose(response -> {
-            assertThat(response.gossipRunning()).isEqualTo(false);
+            assertThat(response.gossipRunningStatus()).isEqualTo("NOT_RUNNING");
             assertThat(context.cluster().getFirstRunningInstance().nodetool("enablegossip"))
             .isEqualTo(0);
             return getGossipStatus();
         })
         .compose(response -> {
-            assertThat(response.gossipRunning()).isEqualTo(true);
+            assertThat(response.gossipRunningStatus()).isEqualTo("RUNNING");
             return Future.succeededFuture();
         })
         .onSuccess(response -> testContext.completeNow())

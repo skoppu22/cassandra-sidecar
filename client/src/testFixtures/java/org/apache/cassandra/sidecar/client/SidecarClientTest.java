@@ -385,16 +385,31 @@ abstract class SidecarClientTest
     }
 
     @Test
-    public void gossipStatus() throws InterruptedException, ExecutionException, TimeoutException
+    public void gossipStatusRunning() throws InterruptedException, ExecutionException, TimeoutException
     {
         SidecarInstanceImpl sidecarInstance = instances.get(3);
-        String gossipStatusAsString = "{\"gossipRunning\":\"true\"}";
+        String gossipStatusAsString = "{\"gossipRunningStatus\":\"RUNNING\"}";
         MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(gossipStatusAsString);
         enqueue(response);
 
         GossipStatusResponse result = client.gossipStatus(sidecarInstance).get(30, TimeUnit.SECONDS);
         assertThat(result).isNotNull();
-        assertThat(result.gossipRunning()).isTrue();
+        assertThat(result.gossipRunningStatus()).isEqualTo("RUNNING");
+
+        validateResponseServed(ApiEndpointsV1.GOSSIP_STATUS_ROUTE);
+    }
+
+    @Test
+    public void gossipStatusNotRunning() throws InterruptedException, ExecutionException, TimeoutException
+    {
+        SidecarInstanceImpl sidecarInstance = instances.get(3);
+        String gossipStatusAsString = "{\"gossipRunningStatus\":\"NOT_RUNNING\"}";
+        MockResponse response = new MockResponse().setResponseCode(OK.code()).setBody(gossipStatusAsString);
+        enqueue(response);
+
+        GossipStatusResponse result = client.gossipStatus(sidecarInstance).get(30, TimeUnit.SECONDS);
+        assertThat(result).isNotNull();
+        assertThat(result.gossipRunningStatus()).isEqualTo("NOT_RUNNING");
 
         validateResponseServed(ApiEndpointsV1.GOSSIP_STATUS_ROUTE);
     }

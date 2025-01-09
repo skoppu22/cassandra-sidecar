@@ -27,20 +27,20 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class GossipStatusResponse
 {
-    private final boolean gossipRunning;
+    private final String gossipRunningStatus;
 
     /**
      * Constructs a response with gossip status
-     * @param gossipRunning running status of gossip
+     * @param gossipRunningStatus running status of gossip
      */
-    public GossipStatusResponse(@JsonProperty("gossipRunning") boolean gossipRunning)
+    public GossipStatusResponse(@JsonProperty("gossipRunningStatus") String gossipRunningStatus)
     {
-        this.gossipRunning = gossipRunning;
+        this.gossipRunningStatus = gossipRunningStatus;
     }
 
-    @JsonProperty("gossipRunning")
-    public boolean gossipRunning()
+    @JsonProperty("gossipRunningStatus")
+    public String gossipRunningStatus()
     {
-        return gossipRunning;
+        return gossipRunningStatus;
     }
 }

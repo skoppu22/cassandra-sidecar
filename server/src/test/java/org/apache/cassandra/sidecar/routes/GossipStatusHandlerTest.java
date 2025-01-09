@@ -48,34 +48,34 @@ public class GossipStatusHandlerTest extends JmxCommonTest
     @Test
     void testGossipRunning(VertxTestContext context)
     {
-        when(storageOperations.gossipStatus()).thenReturn(new GossipStatusResponse(true));
+        when(storageOperations.gossipStatus()).thenReturn(new GossipStatusResponse("RUNNING"));
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
-              .send(context.succeeding(response -> verifyValidResponse(context, response, true)));
+              .send(context.succeeding(response -> verifyValidResponse(context, response, "RUNNING")));
     }
 
     @Test
     void testGossipNotRunning(VertxTestContext context)
     {
-        when(storageOperations.gossipStatus()).thenReturn(new GossipStatusResponse(false));
+        when(storageOperations.gossipStatus()).thenReturn(new GossipStatusResponse("NOT_RUNNING"));
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute)
               .expect(ResponsePredicate.SC_OK)
-              .send(context.succeeding(response -> verifyValidResponse(context, response, false)));
+              .send(context.succeeding(response -> verifyValidResponse(context, response, "NOT_RUNNING")));
     }
 
     @Test
     void testWithInstanceId(VertxTestContext context)
     {
-        when(storageOperations.gossipStatus()).thenReturn(new GossipStatusResponse(true));
+        when(storageOperations.gossipStatus()).thenReturn(new GossipStatusResponse("RUNNING"));
 
         WebClient client = WebClient.create(vertx);
         client.get(server.actualPort(), "127.0.0.1", testRoute + "?instanceId=200")
               .expect(ResponsePredicate.SC_OK)
-              .send(context.succeeding(response -> verifyValidResponse(context, response, true)));
+              .send(context.succeeding(response -> verifyValidResponse(context, response, "RUNNING")));
     }
 
     @Test
@@ -106,12 +106,12 @@ public class GossipStatusHandlerTest extends JmxCommonTest
               }));
     }
 
-    private void verifyValidResponse(VertxTestContext context, HttpResponse<Buffer> response, boolean expectedValue)
+    private void verifyValidResponse(VertxTestContext context, HttpResponse<Buffer> response, String expectedValue)
     {
         context.verify(() -> {
             JsonObject responseJson = response.bodyAsJsonObject();
             assertThat(response.statusCode()).isEqualTo(OK.code());
-            assertThat(responseJson.getBoolean("gossipRunning")).isEqualTo(expectedValue);
+            assertThat(responseJson.getString("gossipRunningStatus")).isEqualTo(expectedValue);
             context.completeNow();
         });
     }

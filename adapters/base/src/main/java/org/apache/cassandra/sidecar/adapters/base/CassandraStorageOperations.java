@@ -219,6 +219,6 @@ public class CassandraStorageOperations implements StorageOperations
     public GossipStatusResponse gossipStatus()
     {
         return new GossipStatusResponse(jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME)
-                                                 .isGossipRunning());
+                                                 .isGossipRunning() ? "RUNNING" : "NOT_RUNNING");
     }
 }
