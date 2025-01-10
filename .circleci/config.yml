@@ -102,8 +102,8 @@ jobs:
     docker:
       - image: cimg/openjdk:8.0
     environment:
-      INTEGRATION_MAX_PARALLEL_FORKS: 3
-      INTEGRATION_MAX_HEAP_SIZE: "2500M"
+      INTEGRATION_MAX_PARALLEL_FORKS: 2
+      INTEGRATION_MAX_HEAP_SIZE: "3000M"
     resource_class: large
     steps:
       - install_common
@@ -154,8 +154,8 @@ jobs:
     docker:
       - image: cimg/openjdk:8.0
     environment:
-      INTEGRATION_MAX_PARALLEL_FORKS: 3
-      INTEGRATION_MAX_HEAP_SIZE: "2500M"
+      INTEGRATION_MAX_PARALLEL_FORKS: 2
+      INTEGRATION_MAX_HEAP_SIZE: "3000M"
     resource_class: large
     steps:
       - install_common
@@ -241,8 +241,8 @@ jobs:
     docker:
       - image: cimg/openjdk:11.0
     environment:
-      INTEGRATION_MAX_PARALLEL_FORKS: 3
-      INTEGRATION_MAX_HEAP_SIZE: "2500M"
+      INTEGRATION_MAX_PARALLEL_FORKS: 2
+      INTEGRATION_MAX_HEAP_SIZE: "3000M"
     resource_class: large
     steps:
       - install_common
@@ -293,8 +293,8 @@ jobs:
     docker:
       - image: cimg/openjdk:11.0
     environment:
-      INTEGRATION_MAX_PARALLEL_FORKS: 3
-      INTEGRATION_MAX_HEAP_SIZE: "2500M"
+      INTEGRATION_MAX_PARALLEL_FORKS: 2
+      INTEGRATION_MAX_HEAP_SIZE: "3000M"
     resource_class: large
     steps:
       - install_common
@@ -345,8 +345,8 @@ jobs:
     docker:
       - image: cimg/openjdk:11.0
     environment:
-      INTEGRATION_MAX_PARALLEL_FORKS: 3
-      INTEGRATION_MAX_HEAP_SIZE: "2500M"
+      INTEGRATION_MAX_PARALLEL_FORKS: 2
+      INTEGRATION_MAX_HEAP_SIZE: "3000M"
     resource_class: large
     steps:
       - install_common
