@@ -150,6 +150,12 @@ class ListOperationalJobsHandlerTest
         }
 
         @Override
+        public boolean isRunningOnCassandra()
+        {
+            return false;
+        }
+
+        @Override
         protected void executeInternal() throws OperationalJobException
         {
         }

@@ -102,4 +102,16 @@ public interface StorageOperations
     {
         outOfRangeDataCleanup(keyspace, table, 1);
     }
+
+    /**
+     * @return the operation-mode of the Cassandra instance
+     */
+    String operationMode();
+
+    /**
+     * Triggers the node decommission operation
+     *
+     * @param force force decommission, bypassing RF checks, when this flag is set
+     */
+    void decommission(boolean force);
 }

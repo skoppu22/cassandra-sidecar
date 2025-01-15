@@ -60,6 +60,12 @@ class OperationalJobTest
             }
 
             @Override
+            public boolean isRunningOnCassandra()
+            {
+                return jobStatus == OperationalJobStatus.RUNNING;
+            }
+
+            @Override
             public OperationalJobStatus status()
             {
                 return jobStatus;
@@ -82,6 +88,12 @@ class OperationalJobTest
     {
         return new OperationalJob(jobId)
         {
+            @Override
+            public boolean isRunningOnCassandra()
+            {
+                return false;
+            }
+
             @Override
             protected void executeInternal() throws OperationalJobException
             {
@@ -122,6 +134,12 @@ class OperationalJobTest
         String msg = "Test Job failed";
         OperationalJob failingJob = new OperationalJob(UUIDs.timeBased())
         {
+            @Override
+            public boolean isRunningOnCassandra()
+            {
+                return false;
+            }
+
             @Override
             protected void executeInternal() throws OperationalJobException
             {

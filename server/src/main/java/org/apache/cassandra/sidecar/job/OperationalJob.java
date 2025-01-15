@@ -20,7 +20,6 @@ package org.apache.cassandra.sidecar.job;
 
 import java.time.Duration;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +41,7 @@ public abstract class OperationalJob implements Task<Void>
     private static final Logger LOGGER = LoggerFactory.getLogger(OperationalJob.class);
 
     // use v1 time-based uuid
-    public final UUID jobId;
+    private final UUID jobId;
 
     private final Promise<Void> executionPromise;
     private volatile boolean isExecuting = false;
@@ -57,6 +56,11 @@ public abstract class OperationalJob implements Task<Void>
         Preconditions.checkArgument(jobId.version() == 1, "OperationalJob accepts only time-based UUID");
         this.jobId = jobId;
         this.executionPromise = Promise.promise();
+    }
+
+    public UUID jobId()
+    {
+        return jobId;
     }
 
     @Override
@@ -96,11 +100,16 @@ public abstract class OperationalJob implements Task<Void>
     }
 
     /**
+     * The concrete-job-specific implementation to determine if the job is running on the Cassandra node.
+     * @return true if the job is running on the Cassandra node. For example, node decommission is tracked by the
+     * operationMode exposed from Cassandra.
+     */
+    public abstract boolean isRunningOnCassandra();
+
+    /**
      * Determines the status of the job. OperationalJob subclasses could choose to override the method.
      * <p>
      * For long-lived jobs, the implementations should return the {@link OperationalJobStatus#RUNNING} status intelligently.
-     * The condition of {@link OperationalJobStatus#RUNNING} is implementation-specific.
-     * For example, node decommission is tracked by the operationMode exposed from Cassandra.
      * If the operationMode is LEAVING, the corresponding OperationalJob is {@link OperationalJobStatus#RUNNING}.
      * In this case, even if the OperationalJobStatus determined from this method is {@link OperationalJobStatus#CREATED},
      * the concrete implementation can override and return {@link OperationalJobStatus#RUNNING}.
@@ -113,7 +122,8 @@ public abstract class OperationalJob implements Task<Void>
     public OperationalJobStatus status()
     {
         Future<Void> fut = asyncResult();
-        if (!isExecuting)
+        // Jobs that are created and yet to be picked up by the executor thread
+        if (!isExecuting && !fut.isComplete())
         {
             return OperationalJobStatus.CREATED;
         }
@@ -140,12 +150,12 @@ public abstract class OperationalJob implements Task<Void>
      * Get the async result with waiting for at most the specified wait time
      * <p>
      * Note: This call does not block the calling thread.
-     * The call-site should handle the possible failed future with {@link TimeoutException} from this method.
      *
      * @param executorPool executor pool to run the timer
      * @param waitTime     maximum time to wait before returning
-     * @return the async result or a failed future of {@link OperationalJobException} with the cause
-     * {@link TimeoutException} after exceeding the wait time
+     * @return a future that is either the result of the configured timeout based on {@code waitTime} or the async
+     * result. A succeeded future here, represents either a timeout or the result of the job and a failure is
+     * represented by an exception thrown by the job execution, within the configured timeout.
      */
     public Future<Void> asyncResult(TaskExecutorPool executorPool, Duration waitTime)
     {
@@ -163,9 +173,8 @@ public abstract class OperationalJob implements Task<Void>
         // Completes as soon as any future succeeds, or when all futures fail. Note that maxWaitTimePromise is
         // closed as soon as resultFut completes
         return Future.any(maxWaitTimeFut, resultFut)
-                     // We want to return the result when applicable, of course.
-                     // If this lambda below is evaluated, both futures are completed;
-                     // Depending on whether timeout flag is set, it either throws or complete with result
+                     // If this lambda below is evaluated, either one of the futures have completed;
+                     // In either case, the future corresponding to the job execution is returned
                      .compose(f -> {
                          boolean isTimeout = maxWaitTimeFut.result();
                          if (isTimeout)
@@ -179,10 +188,8 @@ public abstract class OperationalJob implements Task<Void>
 
     /**
      * OperationalJob body. The implementation is executed in a blocking manner.
-     *
-     * @throws OperationalJobException OperationalJobException that wraps job failure
      */
-    protected abstract void executeInternal() throws OperationalJobException;
+    protected abstract void executeInternal();
 
     /**
      * Execute the job behavior as specified in the internal execution {@link #executeInternal()},

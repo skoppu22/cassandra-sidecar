@@ -665,6 +665,19 @@ public class SidecarClient implements AutoCloseable, SidecarClientBlobRestoreExt
     }
 
     /**
+     * Executes the node decommission request using the default retry policy and configured selection policy
+     * @param instance the instance where the request will be executed
+     * @return a completable future of the jobs list
+     */
+    public CompletableFuture<OperationalJobResponse> nodeDecommission(SidecarInstance instance)
+    {
+        return executor.executeRequestAsync(requestBuilder()
+                                            .singleInstanceSelectionPolicy(instance)
+                                            .nodeDecommissionRequest()
+                                            .build());
+    }
+
+    /**
      * Returns a copy of the request builder with the default parameters configured for the client.
      *
      * <p>The request builder can be used to create the request, containing default values as depicted in the example

@@ -213,4 +213,24 @@ public class CassandraStorageOperations implements StorageOperations
         jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME)
                  .forceKeyspaceCleanup(concurrency, keyspace, table);
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String operationMode()
+    {
+        StorageJmxOperations ssProxy = jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME);
+        return ssProxy.getOperationMode();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void decommission(boolean force)
+    {
+        StorageJmxOperations ssProxy = jmxClient.proxy(StorageJmxOperations.class, STORAGE_SERVICE_OBJ_NAME);
+        ssProxy.decommission(force);
+    }
 }
