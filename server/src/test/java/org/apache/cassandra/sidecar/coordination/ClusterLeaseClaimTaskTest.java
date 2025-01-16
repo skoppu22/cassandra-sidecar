@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.sidecar.coordination;
 
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -27,12 +28,13 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import io.vertx.core.Vertx;
+import org.apache.cassandra.sidecar.common.server.utils.MillisecondBoundConfiguration;
 import org.apache.cassandra.sidecar.config.ServiceConfiguration;
 import org.apache.cassandra.sidecar.db.SidecarLeaseDatabaseAccessor;
 import org.apache.cassandra.sidecar.metrics.SidecarMetrics;
 import org.apache.cassandra.sidecar.tasks.ScheduleDecision;
 
-import static org.apache.cassandra.sidecar.coordination.ClusterLeaseClaimTask.MINIMUM_DELAY_MILLIS;
+import static org.apache.cassandra.sidecar.coordination.ClusterLeaseClaimTask.MINIMUM_DELAY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Answers.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
@@ -96,37 +98,45 @@ class ClusterLeaseClaimTaskTest
     void testInitialDelayFromConfiguration(long configuredDelayMillis)
     {
         ServiceConfiguration mockServiceConfiguration = mock(ServiceConfiguration.class, RETURNS_DEEP_STUBS);
-        when(mockServiceConfiguration.coordinationConfiguration().clusterLeaseClaimConfiguration().initialDelayMillis()).thenReturn(configuredDelayMillis);
+        when(mockServiceConfiguration.coordinationConfiguration().clusterLeaseClaimConfiguration().initialDelay().quantity())
+        .thenReturn(configuredDelayMillis);
+        when(mockServiceConfiguration.coordinationConfiguration().clusterLeaseClaimConfiguration().initialDelay().unit())
+        .thenReturn(TimeUnit.MILLISECONDS);
+        when(mockServiceConfiguration.coordinationConfiguration().clusterLeaseClaimConfiguration().initialDelay().to(TimeUnit.MILLISECONDS))
+        .thenCallRealMethod();
         ClusterLeaseClaimTask task = new ClusterLeaseClaimTask(mock(Vertx.class), mockServiceConfiguration, mock(ElectorateMembership.class),
                                                                mock(SidecarLeaseDatabaseAccessor.class), new ClusterLease(),
                                                                mock(SidecarMetrics.class, RETURNS_DEEP_STUBS));
 
-        assertThat(task.initialDelay()).isEqualTo(configuredDelayMillis);
+        assertThat(task.initialDelay().to(TimeUnit.MILLISECONDS)).isEqualTo(configuredDelayMillis);
     }
 
     @ParameterizedTest(name = "{index} => configuredDelayMillis {0} millis")
-    @ValueSource(longs = { 30_000, 40_000, 50_000, 100_000, 1_000_000, 10_000_000, 20_000_000, Long.MAX_VALUE })
+    @ValueSource(longs = { 30_000, 40_000, 50_000, 100_000, 1_000_000, 10_000_000, 20_000_000, Long.MAX_VALUE - 1 })
     void testDelayFromConfiguration(long configuredDelayMillis)
     {
         ServiceConfiguration mockServiceConfiguration = mock(ServiceConfiguration.class, RETURNS_DEEP_STUBS);
-        when(mockServiceConfiguration.coordinationConfiguration().clusterLeaseClaimConfiguration().executeIntervalMillis()).thenReturn(configuredDelayMillis);
+        MillisecondBoundConfiguration value = new MillisecondBoundConfiguration(configuredDelayMillis, TimeUnit.MILLISECONDS);
+        when(mockServiceConfiguration.coordinationConfiguration()
+                                     .clusterLeaseClaimConfiguration()
+                                     .executeInterval()).thenReturn(value);
         ClusterLeaseClaimTask task = new ClusterLeaseClaimTask(mock(Vertx.class), mockServiceConfiguration, mock(ElectorateMembership.class),
                                                                mock(SidecarLeaseDatabaseAccessor.class), new ClusterLease(),
                                                                mock(SidecarMetrics.class, RETURNS_DEEP_STUBS));
 
-        assertThat(task.delay()).isEqualTo(configuredDelayMillis);
+        assertThat(task.delay().to(TimeUnit.MILLISECONDS)).isEqualTo(configuredDelayMillis);
     }
 
     @Test
     void testCannotConfigureDelayLessThanMinimum()
     {
         ServiceConfiguration mockServiceConfiguration = mock(ServiceConfiguration.class, RETURNS_DEEP_STUBS);
-        long lessThanMinimum = MINIMUM_DELAY_MILLIS - 1L;
-        when(mockServiceConfiguration.coordinationConfiguration().clusterLeaseClaimConfiguration().executeIntervalMillis()).thenReturn(lessThanMinimum);
+        MillisecondBoundConfiguration lessThanMinimum = MillisecondBoundConfiguration.parse("29s");
+        when(mockServiceConfiguration.coordinationConfiguration().clusterLeaseClaimConfiguration().executeInterval()).thenReturn(lessThanMinimum);
         ClusterLeaseClaimTask task = new ClusterLeaseClaimTask(mock(Vertx.class), mockServiceConfiguration, mock(ElectorateMembership.class),
                                                                mock(SidecarLeaseDatabaseAccessor.class), new ClusterLease(),
                                                                mock(SidecarMetrics.class, RETURNS_DEEP_STUBS));
-        assertThat(task.delay()).as("The minimum is guaranteed").isEqualTo(MINIMUM_DELAY_MILLIS);
+        assertThat(task.delay()).as("The minimum is guaranteed").isEqualTo(MINIMUM_DELAY);
     }
 
     private ServiceConfiguration mockConfiguration(boolean schemaConfigurationEnabled, boolean featureEnabled)

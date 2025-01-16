@@ -27,8 +27,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.inject.Inject;
-import com.google.inject.Singleton;
 import io.vertx.core.Closeable;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -49,7 +47,6 @@ import org.jetbrains.annotations.VisibleForTesting;
  * next run, perhaps in another thread. In other words, writes in the prior run can be read by its next run,
  * as if it is running in a single thread.
  */
-@Singleton
 public class PeriodicTaskExecutor implements Closeable
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskExecutor.class);
@@ -62,7 +59,6 @@ public class PeriodicTaskExecutor implements Closeable
     private final TaskExecutorPool internalPool;
     private final ClusterLease clusterLease;
 
-    @Inject
     public PeriodicTaskExecutor(ExecutorPools executorPools, ClusterLease clusterLease)
     {
         this.internalPool = executorPools.internal();
@@ -77,7 +73,7 @@ public class PeriodicTaskExecutor implements Closeable
     public void schedule(PeriodicTask task)
     {
         PeriodicTaskKey key = new PeriodicTaskKey(task);
-        schedule(key, 0, task.initialDelayMillis(), 0);
+        schedule(key, 0, task.initialDelay().to(TimeUnit.MILLISECONDS), 0);
     }
 
     private void schedule(PeriodicTaskKey key, long priorExecDurationMillis, long delayMillis, long execCount)
@@ -147,7 +143,7 @@ public class PeriodicTaskExecutor implements Closeable
                             return;
                         }
                         long priorExecutionDurationMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime);
-                        schedule(key, priorExecutionDurationMillis, key.task.delayMillis(), execCount + 1);
+                        schedule(key, priorExecutionDurationMillis, key.task.delay().to(TimeUnit.MILLISECONDS), execCount + 1);
                     });
     }
 

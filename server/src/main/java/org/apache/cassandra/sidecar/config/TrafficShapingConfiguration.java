@@ -18,6 +18,8 @@
 
 package org.apache.cassandra.sidecar.config;
 
+import org.apache.cassandra.sidecar.common.server.utils.MillisecondBoundConfiguration;
+
 /**
  * Configuration for the global traffic shaping options. These TCP server options enable configuration of
  * bandwidth limiting. Both inbound and outbound bandwidth can be limited through these options.
@@ -41,15 +43,15 @@ public interface TrafficShapingConfiguration
     long peakOutboundGlobalBandwidthBytesPerSecond();
 
     /**
-     * @return the maximum delay to wait in case of traffic excess in milliseconds
+     * @return the maximum delay to wait in case of traffic excess
      */
-    long maxDelayToWaitMillis();
+    MillisecondBoundConfiguration maxDelayToWait();
 
     /**
-     * @return the delay in milliseconds between two computations of performances for channels or {@code 0} if no
-     * stats are to be computed
+     * @return the delay between two computations of performances for channels or {@code 0} if no stats
+     * are to be computed
      */
-    long checkIntervalForStatsMillis();
+    MillisecondBoundConfiguration checkIntervalForStats();
 
     /**
      * @return the bandwidth limit in bytes per second for incoming files (i.e. SSTable components upload), this

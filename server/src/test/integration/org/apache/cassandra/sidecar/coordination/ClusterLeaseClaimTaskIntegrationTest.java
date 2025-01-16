@@ -53,6 +53,7 @@ import org.apache.cassandra.distributed.impl.AbstractCluster;
 import org.apache.cassandra.distributed.shared.Versions;
 import org.apache.cassandra.sidecar.cluster.CQLSessionProviderImpl;
 import org.apache.cassandra.sidecar.common.server.CQLSessionProvider;
+import org.apache.cassandra.sidecar.common.server.utils.SecondBoundConfiguration;
 import org.apache.cassandra.sidecar.config.SchemaKeyspaceConfiguration;
 import org.apache.cassandra.sidecar.config.ServiceConfiguration;
 import org.apache.cassandra.sidecar.config.yaml.SchemaKeyspaceConfigurationImpl;
@@ -104,7 +105,7 @@ class ClusterLeaseClaimTaskIntegrationTest
         when(mockSchemaConfig.keyspace()).thenReturn(SchemaKeyspaceConfigurationImpl.DEFAULT_KEYSPACE);
         when(mockSchemaConfig.replicationStrategy()).thenReturn(SchemaKeyspaceConfigurationImpl.DEFAULT_REPLICATION_STRATEGY);
         when(mockSchemaConfig.replicationFactor()).thenReturn(SchemaKeyspaceConfigurationImpl.DEFAULT_REPLICATION_FACTOR);
-        when(mockSchemaConfig.leaseSchemaTTLSeconds()).thenReturn(5L);
+        when(mockSchemaConfig.leaseSchemaTTL()).thenReturn(SecondBoundConfiguration.parse("5s"));
     }
 
     @ParameterizedTest(name = "{index} => version {0}")

@@ -18,6 +18,8 @@
 
 package org.apache.cassandra.sidecar.config;
 
+import org.apache.cassandra.sidecar.common.server.utils.MillisecondBoundConfiguration;
+
 /**
  * General JMX connectivity configuration that is not instance-specific.
  */
@@ -29,7 +31,7 @@ public interface JmxConfiguration
     int maxRetries();
 
     /**
-     * @return the delay, in milliseconds, between retry attempts
+     * @return the delay between retry attempts
      */
-    long retryDelayMillis();
+    MillisecondBoundConfiguration retryDelay();
 }

@@ -18,6 +18,8 @@
 
 package org.apache.cassandra.sidecar.config;
 
+import org.apache.cassandra.sidecar.common.server.utils.MillisecondBoundConfiguration;
+
 /**
  * Encapsulates configurations for the worker pool
  */
@@ -34,7 +36,7 @@ public interface WorkerPoolConfiguration
     int workerPoolSize();
 
     /**
-     * @return the maximum execution time for the worker pool in milliseconds
+     * @return the maximum execution time for the worker pool
      */
-    long workerMaxExecutionTimeMillis();
+    MillisecondBoundConfiguration workerMaxExecutionTime();
 }

@@ -29,6 +29,7 @@ import io.vertx.ext.auth.authentication.CertificateCredentials;
 import io.vertx.ext.auth.authentication.CredentialValidationException;
 import io.vertx.ext.auth.mtls.utils.CertificateBuilder;
 import org.apache.cassandra.sidecar.acl.authentication.CassandraIdentityExtractor;
+import org.apache.cassandra.sidecar.common.server.utils.MillisecondBoundConfiguration;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.config.AccessControlConfiguration;
 import org.apache.cassandra.sidecar.config.CacheConfiguration;
@@ -117,7 +118,7 @@ class CassandraIdentityExtractorTest
         when(mockSidecarConfig.accessControlConfiguration()).thenReturn(mockAccessControlConfig);
         CacheConfiguration mockCacheConfig = mock(CacheConfiguration.class);
         when(mockCacheConfig.enabled()).thenReturn(true);
-        when(mockCacheConfig.expireAfterAccessMillis()).thenReturn(3000L);
+        when(mockCacheConfig.expireAfterAccess()).thenReturn(MillisecondBoundConfiguration.parse("3s"));
         when(mockCacheConfig.maximumSize()).thenReturn(10L);
         when(mockAccessControlConfig.permissionCacheConfiguration()).thenReturn(mockCacheConfig);
 

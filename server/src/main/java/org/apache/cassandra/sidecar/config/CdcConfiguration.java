@@ -17,13 +17,15 @@
  */
 package org.apache.cassandra.sidecar.config;
 
+import org.apache.cassandra.sidecar.common.server.utils.SecondBoundConfiguration;
+
 /**
  * This class encapsulates configuration values for cdc.
  */
 public interface CdcConfiguration
 {
     /**
-     * @return segment hard link cache expiration time in seconds used in {@link org.apache.cassandra.sidecar.cdc.CdcLogCache}
+     * @return segment hard link cache expiration time used in {@link org.apache.cassandra.sidecar.cdc.CdcLogCache}
      */
-    long segmentHardlinkCacheExpiryInSecs();
+    SecondBoundConfiguration segmentHardLinkCacheExpiry();
 }

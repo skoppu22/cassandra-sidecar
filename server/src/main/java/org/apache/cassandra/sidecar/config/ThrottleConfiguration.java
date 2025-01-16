@@ -18,6 +18,8 @@
 
 package org.apache.cassandra.sidecar.config;
 
+import org.apache.cassandra.sidecar.common.server.utils.SecondBoundConfiguration;
+
 /**
  * The traffic shaping configuration options for the service
  */
@@ -29,8 +31,7 @@ public interface ThrottleConfiguration
     long rateLimitStreamRequestsPerSecond();
 
     /**
-     * @return timeout in seconds used to determine when to stop retrying stream requests when stream requests
-     * are throttled.
+     * @return timeout used to determine when to stop retrying stream requests when stream requests are throttled.
      */
-    long timeoutInSeconds();
+    SecondBoundConfiguration timeout();
 }

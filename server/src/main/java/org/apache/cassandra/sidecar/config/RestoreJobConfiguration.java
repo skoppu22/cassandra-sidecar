@@ -18,21 +18,24 @@
 
 package org.apache.cassandra.sidecar.config;
 
+import org.apache.cassandra.sidecar.common.server.utils.MillisecondBoundConfiguration;
+import org.apache.cassandra.sidecar.common.server.utils.SecondBoundConfiguration;
+
 /**
  * Configuration needed for restore jobs restoring data through sidecar
  */
 public interface RestoreJobConfiguration
 {
     /**
-     * @return the delay in milliseconds for job discovery active loop, e.g. there are active jobs discovered
+     * @return the delay for job discovery active loop, e.g. there are active jobs discovered
      */
-    long jobDiscoveryActiveLoopDelayMillis();
+    MillisecondBoundConfiguration jobDiscoveryActiveLoopDelay();
 
     /**
-     * @return the delay in milliseconds for job discovery idle loop, e.g. no active job discovered at the moment
-     * jobDiscoveryIdleLoopDelayMillis should be configured larger than jobDiscoveryActiveLoopDelayMillis
+     * @return the delay for job discovery idle loop, e.g. no active job discovered at the moment
+     * jobDiscoveryIdleLoopDelay should be configured larger than jobDiscoveryActiveLoopDelay
      */
-    long jobDiscoveryIdleLoopDelayMillis();
+    MillisecondBoundConfiguration jobDiscoveryIdleLoopDelay();
 
     /**
      * @return the minimum number of days in the past to look up the restore jobs
@@ -47,20 +50,20 @@ public interface RestoreJobConfiguration
     /**
      * @return time to live for restore job tables: restore_job and restore_slice
      */
-    long restoreJobTablesTtlSeconds();
+    SecondBoundConfiguration restoreJobTablesTtl();
 
     /**
-     * @return the number of seconds above which a restore task is considered slow
+     * @return the amount of time above which a restore task is considered slow
      */
-    long slowTaskThresholdSeconds();
+    SecondBoundConfiguration slowTaskThreshold();
 
     /**
-     * @return the delay in seconds between each report of the same slow task
+     * @return the delay between each report of the same slow task
      */
-    long slowTaskReportDelaySeconds();
+    SecondBoundConfiguration slowTaskReportDelay();
 
     /**
-     * @return the delay in milliseconds for {@link org.apache.cassandra.sidecar.restore.RingTopologyRefresher}
+     * @return the delay for {@link org.apache.cassandra.sidecar.restore.RingTopologyRefresher}
      */
-    long ringTopologyRefreshDelayMillis();
+    MillisecondBoundConfiguration ringTopologyRefreshDelay();
 }

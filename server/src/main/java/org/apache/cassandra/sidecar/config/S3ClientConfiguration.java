@@ -18,6 +18,9 @@
 
 package org.apache.cassandra.sidecar.config;
 
+import org.apache.cassandra.sidecar.common.server.utils.MillisecondBoundConfiguration;
+import org.apache.cassandra.sidecar.common.server.utils.SecondBoundConfiguration;
+
 /**
  * Configuration needed for S3 client used by Sidecar for purposes like restoring, etc.
  */
@@ -33,7 +36,7 @@ public interface S3ClientConfiguration
     /**
      * @return the timeout of idle threads
      */
-    long threadKeepAliveSeconds();
+    SecondBoundConfiguration threadKeepAlive();
 
     /**
      * Returns range bytes size to produce <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-range">Range header</a> for range-get object.
@@ -43,10 +46,9 @@ public interface S3ClientConfiguration
     int rangeGetObjectBytesSize();
 
     /**
-     * API call timeout in milliseconds for S3 API calls.
-     * @return duration of timeout in milliseconds
+     * @return API call timeout for S3 API calls
      */
-    long apiCallTimeoutMillis();
+    MillisecondBoundConfiguration apiCallTimeout();
 
     /**
      * Route traffic through a proxy in the environment that requires doing so, when a proxy is specified

@@ -18,6 +18,8 @@
 
 package org.apache.cassandra.sidecar.config;
 
+import org.apache.cassandra.sidecar.common.server.utils.SecondBoundConfiguration;
+
 /**
  * Configuration for sidecar schema creation
  */
@@ -44,9 +46,9 @@ public interface SchemaKeyspaceConfiguration
     int replicationFactor();
 
     /**
-     * @return the TTL in seconds used to insert entries into the sidecar_lease schema
+     * @return the TTL used to insert entries into the sidecar_lease schema
      */
-    long leaseSchemaTTLSeconds();
+    SecondBoundConfiguration leaseSchemaTTL();
 
     default String createReplicationStrategyString()
     {
