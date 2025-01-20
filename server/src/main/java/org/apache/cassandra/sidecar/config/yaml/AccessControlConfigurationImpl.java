@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.cassandra.sidecar.acl.authorization.AllowAllAuthorizationProvider;
 import org.apache.cassandra.sidecar.common.server.utils.MillisecondBoundConfiguration;
 import org.apache.cassandra.sidecar.config.AccessControlConfiguration;
 import org.apache.cassandra.sidecar.config.CacheConfiguration;
@@ -35,6 +36,8 @@ public class AccessControlConfigurationImpl implements AccessControlConfiguratio
 {
     private static final boolean DEFAULT_ENABLED = false;
     private static final List<ParameterizedClassConfiguration> DEFAULT_AUTHENTICATORS_CONFIGURATION = Collections.emptyList();
+    private static final ParameterizedClassConfiguration DEFAULT_AUTHORIZER_CONFIGURATION
+    = new ParameterizedClassConfigurationImpl(AllowAllAuthorizationProvider.class.getName(), Collections.emptyMap());
     private static final Set<String> DEFAULT_ADMIN_IDENTITIES = Collections.emptySet();
     private static final CacheConfiguration DEFAULT_PERMISSION_CACHE_CONFIGURATION =
     new CacheConfigurationImpl(MillisecondBoundConfiguration.parse("2h"), 1_000);
@@ -45,6 +48,9 @@ public class AccessControlConfigurationImpl implements AccessControlConfiguratio
     @JsonProperty(value = "authenticators")
     protected final List<ParameterizedClassConfiguration> authenticatorsConfiguration;
 
+    @JsonProperty(value = "authorizer")
+    protected final ParameterizedClassConfiguration authorizerConfiguration;
+
     @JsonProperty(value = "admin_identities")
     protected final Set<String> adminIdentities;
 
@@ -53,16 +59,19 @@ public class AccessControlConfigurationImpl implements AccessControlConfiguratio
 
     public AccessControlConfigurationImpl()
     {
-        this(DEFAULT_ENABLED, DEFAULT_AUTHENTICATORS_CONFIGURATION, DEFAULT_ADMIN_IDENTITIES, DEFAULT_PERMISSION_CACHE_CONFIGURATION);
+        this(DEFAULT_ENABLED, DEFAULT_AUTHENTICATORS_CONFIGURATION, DEFAULT_AUTHORIZER_CONFIGURATION,
+             DEFAULT_ADMIN_IDENTITIES, DEFAULT_PERMISSION_CACHE_CONFIGURATION);
     }
 
     public AccessControlConfigurationImpl(boolean enabled,
                                           List<ParameterizedClassConfiguration> authenticatorsConfiguration,
+                                          ParameterizedClassConfiguration authorizerConfiguration,
                                           Set<String> adminIdentities,
                                           CacheConfiguration permissionCacheConfiguration)
     {
         this.enabled = enabled;
         this.authenticatorsConfiguration = authenticatorsConfiguration;
+        this.authorizerConfiguration = authorizerConfiguration;
         this.adminIdentities = adminIdentities;
         this.permissionCacheConfiguration = permissionCacheConfiguration;
     }
@@ -85,6 +94,16 @@ public class AccessControlConfigurationImpl implements AccessControlConfiguratio
     public List<ParameterizedClassConfiguration> authenticatorsConfiguration()
     {
         return authenticatorsConfiguration;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @JsonProperty(value = "authorizer")
+    public ParameterizedClassConfiguration authorizerConfiguration()
+    {
+        return authorizerConfiguration;
     }
 
     /**

@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.SidecarRateLimiter;
@@ -39,19 +40,26 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.Vertx;
 import io.vertx.core.VertxOptions;
 import io.vertx.core.file.FileSystemOptions;
+import io.vertx.core.http.HttpMethod;
+import io.vertx.ext.auth.authorization.AuthorizationProvider;
 import io.vertx.ext.dropwizard.DropwizardMetricsOptions;
 import io.vertx.ext.dropwizard.Match;
 import io.vertx.ext.dropwizard.MatchType;
 import io.vertx.ext.web.Router;
-import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.ChainAuthHandler;
 import io.vertx.ext.web.handler.ErrorHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
 import io.vertx.ext.web.handler.StaticHandler;
 import io.vertx.ext.web.handler.TimeoutHandler;
+import org.apache.cassandra.sidecar.acl.IdentityToRoleCache;
 import org.apache.cassandra.sidecar.acl.authentication.AuthenticationHandlerFactory;
 import org.apache.cassandra.sidecar.acl.authentication.AuthenticationHandlerFactoryRegistry;
 import org.apache.cassandra.sidecar.acl.authentication.MutualTlsAuthenticationHandlerFactory;
+import org.apache.cassandra.sidecar.acl.authorization.AdminIdentityResolver;
+import org.apache.cassandra.sidecar.acl.authorization.AllowAllAuthorizationProvider;
+import org.apache.cassandra.sidecar.acl.authorization.AuthorizationParameterValidateHandler;
+import org.apache.cassandra.sidecar.acl.authorization.RoleAuthorizationsCache;
+import org.apache.cassandra.sidecar.acl.authorization.RoleBasedAuthorizationProvider;
 import org.apache.cassandra.sidecar.adapters.base.CassandraFactory;
 import org.apache.cassandra.sidecar.adapters.cassandra41.Cassandra41Factory;
 import org.apache.cassandra.sidecar.cluster.CQLSessionProviderImpl;
@@ -90,6 +98,7 @@ import org.apache.cassandra.sidecar.db.schema.RestoreRangesSchema;
 import org.apache.cassandra.sidecar.db.schema.RestoreSlicesSchema;
 import org.apache.cassandra.sidecar.db.schema.SidecarInternalKeyspace;
 import org.apache.cassandra.sidecar.db.schema.SidecarLeaseSchema;
+import org.apache.cassandra.sidecar.db.schema.SidecarRolePermissionsSchema;
 import org.apache.cassandra.sidecar.db.schema.SidecarSchema;
 import org.apache.cassandra.sidecar.db.schema.SystemAuthSchema;
 import org.apache.cassandra.sidecar.exceptions.ConfigurationException;
@@ -99,12 +108,15 @@ import org.apache.cassandra.sidecar.metrics.SchemaMetrics;
 import org.apache.cassandra.sidecar.metrics.SidecarMetrics;
 import org.apache.cassandra.sidecar.metrics.SidecarMetricsImpl;
 import org.apache.cassandra.sidecar.metrics.instance.InstanceHealthMetrics;
+import org.apache.cassandra.sidecar.routes.AccessProtectedRouteBuilder;
 import org.apache.cassandra.sidecar.routes.CassandraHealthHandler;
 import org.apache.cassandra.sidecar.routes.ConnectedClientStatsHandler;
 import org.apache.cassandra.sidecar.routes.DiskSpaceProtectionHandler;
 import org.apache.cassandra.sidecar.routes.FileStreamHandler;
 import org.apache.cassandra.sidecar.routes.GossipInfoHandler;
 import org.apache.cassandra.sidecar.routes.JsonErrorHandler;
+import org.apache.cassandra.sidecar.routes.KeyspaceRingHandler;
+import org.apache.cassandra.sidecar.routes.KeyspaceSchemaHandler;
 import org.apache.cassandra.sidecar.routes.ListOperationalJobsHandler;
 import org.apache.cassandra.sidecar.routes.NodeDecommissionHandler;
 import org.apache.cassandra.sidecar.routes.OperationalJobHandler;
@@ -248,9 +260,52 @@ public class MainModule extends AbstractModule
 
     @Provides
     @Singleton
+    public AuthorizationProvider authorizationProvider(SidecarConfiguration sidecarConfiguration,
+                                                       IdentityToRoleCache identityToRoleCache,
+                                                       RoleAuthorizationsCache roleAuthorizationsCache)
+    {
+        AccessControlConfiguration accessControlConfiguration = sidecarConfiguration.accessControlConfiguration();
+        if (!accessControlConfiguration.enabled())
+        {
+            return new AllowAllAuthorizationProvider();
+        }
+
+        ParameterizedClassConfiguration config = accessControlConfiguration.authorizerConfiguration();
+        if (config == null)
+        {
+            throw new ConfigurationException("Access control is enabled, but authorizer not set");
+        }
+
+        if (config.className().equalsIgnoreCase(AllowAllAuthorizationProvider.class.getName()))
+        {
+            return new AllowAllAuthorizationProvider();
+        }
+        if (config.className().equalsIgnoreCase(RoleBasedAuthorizationProvider.class.getName()))
+        {
+            return new RoleBasedAuthorizationProvider(identityToRoleCache, roleAuthorizationsCache);
+        }
+        throw new ConfigurationException("Unrecognized authorization provider " + config.className() + " set");
+    }
+
+    @Provides
+    @Singleton
+    public Supplier<AccessProtectedRouteBuilder> accessProtectedRouteBuilderFactory(SidecarConfiguration sidecarConfiguration,
+                                                                                    AuthorizationProvider authorizationProvider,
+                                                                                    AdminIdentityResolver adminIdentityResolver,
+                                                                                    AuthorizationParameterValidateHandler authorizationParameterValidateHandler)
+    {
+        return () -> new AccessProtectedRouteBuilder(sidecarConfiguration.accessControlConfiguration(),
+                                                     authorizationProvider,
+                                                     adminIdentityResolver,
+                                                     authorizationParameterValidateHandler);
+    }
+
+    @Provides
+    @Singleton
     public Router vertxRouter(Vertx vertx,
                               SidecarConfiguration sidecarConfiguration,
                               ChainAuthHandler chainAuthHandler,
+                              Supplier<AccessProtectedRouteBuilder> protectedRouteBuilderFactory,
                               CassandraHealthHandler cassandraHealthHandler,
                               StreamSSTableComponentHandler streamSSTableComponentHandler,
                               FileStreamHandler fileStreamHandler,
@@ -258,7 +313,9 @@ public class MainModule extends AbstractModule
                               CreateSnapshotHandler createSnapshotHandler,
                               ListSnapshotHandler listSnapshotHandler,
                               SchemaHandler schemaHandler,
+                              KeyspaceSchemaHandler keyspaceSchemaHandler,
                               RingHandler ringHandler,
+                              KeyspaceRingHandler keyspaceRingHandler,
                               TokenRangeReplicaMapHandler tokenRangeHandler,
                               LoggerHandler loggerHandler,
                               GossipInfoHandler gossipInfoHandler,
@@ -309,7 +366,8 @@ public class MainModule extends AbstractModule
               .handler(docs);
 
         // Add custom routers
-        // Provides a simple REST endpoint to determine if Sidecar is available
+        // Provides a simple REST endpoint to determine if Sidecar is available. Health endpoints in Sidecar are
+        // authenticated and exempted from authorization.
         router.get(ApiEndpointsV1.HEALTH_ROUTE)
               .handler(context -> context.json(OK_STATUS));
 
@@ -324,130 +382,197 @@ public class MainModule extends AbstractModule
         router.get(ApiEndpointsV1.CASSANDRA_JMX_HEALTH_ROUTE)
               .handler(cassandraHealthHandler);
 
-        //noinspection deprecation
-        router.get(ApiEndpointsV1.DEPRECATED_COMPONENTS_ROUTE)
-              .handler(streamSSTableComponentHandler)
-              .handler(fileStreamHandler);
-
-        router.get(ApiEndpointsV1.COMPONENTS_ROUTE)
-              .handler(streamSSTableComponentHandler)
-              .handler(fileStreamHandler);
-
-        // Support for routes that want to stream SStable index components
-        router.get(ApiEndpointsV1.COMPONENTS_WITH_SECONDARY_INDEX_ROUTE_SUPPORT)
-              .handler(streamSSTableComponentHandler)
-              .handler(fileStreamHandler);
-
-        //noinspection deprecation
-        router.get(ApiEndpointsV1.DEPRECATED_SNAPSHOTS_ROUTE)
-              .handler(listSnapshotHandler);
-
-        router.get(ApiEndpointsV1.SNAPSHOTS_ROUTE)
-              .handler(listSnapshotHandler);
-
-        router.delete(ApiEndpointsV1.SNAPSHOTS_ROUTE)
-              // Leverage the validateTableExistence. Currently, JMX does not validate for non-existent keyspace.
-              // Additionally, the current JMX implementation to clear snapshots does not support passing a table
-              // as a parameter.
-              .handler(validateTableExistence)
-              .handler(clearSnapshotHandler);
-
-        router.put(ApiEndpointsV1.SNAPSHOTS_ROUTE)
-              .handler(createSnapshotHandler);
-
-        //noinspection deprecation
-        router.get(ApiEndpointsV1.DEPRECATED_ALL_KEYSPACES_SCHEMA_ROUTE)
-              .handler(schemaHandler);
-
-        router.get(ApiEndpointsV1.ALL_KEYSPACES_SCHEMA_ROUTE)
-              .handler(schemaHandler);
-
-        //noinspection deprecation
-        router.get(ApiEndpointsV1.DEPRECATED_KEYSPACE_SCHEMA_ROUTE)
-              .handler(schemaHandler);
-
-        router.get(ApiEndpointsV1.KEYSPACE_SCHEMA_ROUTE)
-              .handler(schemaHandler);
-
-        router.get(ApiEndpointsV1.RING_ROUTE)
-              .handler(ringHandler);
-
-        router.get(ApiEndpointsV1.CONNECTED_CLIENT_STATS_ROUTE)
-              .handler(connectedClientStatsHandler);
-
-        router.get(ApiEndpointsV1.OPERATIONAL_JOB_ROUTE)
-              .handler(operationalJobHandler);
-
-        router.get(ApiEndpointsV1.LIST_OPERATIONAL_JOBS_ROUTE)
-              .handler(listOperationalJobsHandler);
-
-        router.put(ApiEndpointsV1.NODE_DECOMMISSION_ROUTE)
-              .handler(nodeDecommissionHandler);
-
-        router.get(ApiEndpointsV1.RING_ROUTE_PER_KEYSPACE)
-              .handler(ringHandler);
-
-        router.put(ApiEndpointsV1.SSTABLE_UPLOAD_ROUTE)
-              .handler(ssTableUploadHandler);
-
-        router.get(ApiEndpointsV1.KEYSPACE_TOKEN_MAPPING_ROUTE)
-              .handler(tokenRangeHandler);
-
-        router.put(ApiEndpointsV1.SSTABLE_IMPORT_ROUTE)
-              .handler(ssTableImportHandler);
-
-        router.delete(ApiEndpointsV1.SSTABLE_CLEANUP_ROUTE)
-              .handler(ssTableCleanupHandler);
-
-        router.get(ApiEndpointsV1.GOSSIP_INFO_ROUTE)
-              .handler(gossipInfoHandler);
+        // Node settings endpoint is not Access protected. Any user who can log in into Cassandra is able to view
+        // node settings information. Since sidecar and cassandra share list of authenticated identities, sidecar's
+        // authenticated users can also read node settings information.
+        router.get(ApiEndpointsV1.NODE_SETTINGS_ROUTE)
+              .handler(nodeSettingsHandler);
 
         router.get(ApiEndpointsV1.TIME_SKEW_ROUTE)
               .handler(timeSkewHandler);
 
-        router.get(ApiEndpointsV1.NODE_SETTINGS_ROUTE)
-              .handler(nodeSettingsHandler);
+        //  NOTE: All routes in Sidecar must be built with AccessProtectedRouteBuilder. AccessProtectedRouteBuilder,
+        //  skips adding AuthorizationHandler in handler chain if access control is disabled.
 
-        router.post(ApiEndpointsV1.CREATE_RESTORE_JOB_ROUTE)
-              .handler(BodyHandler.create())
-              .handler(validateTableExistence)
-              .handler(validateRestoreJobRequest)
-              .handler(createRestoreJobHandler);
+        //noinspection deprecation
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.DEPRECATED_COMPONENTS_ROUTE)
+                                    .handler(streamSSTableComponentHandler)
+                                    .handler(fileStreamHandler)
+                                    .build();
 
-        router.post(ApiEndpointsV1.RESTORE_JOB_SLICES_ROUTE)
-              .handler(BodyHandler.create())
-              .handler(diskSpaceProtection) // reject creating slice if short of disk space
-              .handler(validateTableExistence)
-              .handler(validateRestoreJobRequest)
-              .handler(createRestoreSliceHandler);
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.COMPONENTS_ROUTE)
+                                    .handler(streamSSTableComponentHandler)
+                                    .handler(fileStreamHandler)
+                                    .build();
 
-        router.get(ApiEndpointsV1.RESTORE_JOB_ROUTE)
-              .handler(validateTableExistence)
-              .handler(validateRestoreJobRequest)
-              .handler(restoreJobSummaryHandler);
+        // Support for routes that want to stream SStable index components
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.COMPONENTS_WITH_SECONDARY_INDEX_ROUTE_SUPPORT)
+                                    .handler(streamSSTableComponentHandler)
+                                    .handler(fileStreamHandler)
+                                    .build();
 
-        router.patch(ApiEndpointsV1.RESTORE_JOB_ROUTE)
-              .handler(BodyHandler.create())
-              .handler(validateTableExistence)
-              .handler(validateRestoreJobRequest)
-              .handler(updateRestoreJobHandler);
+        //noinspection deprecation
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.DEPRECATED_SNAPSHOTS_ROUTE)
+                                    .handler(listSnapshotHandler)
+                                    .build();
 
-        router.post(ApiEndpointsV1.ABORT_RESTORE_JOB_ROUTE)
-              .handler(BodyHandler.create())
-              .handler(validateTableExistence)
-              .handler(validateRestoreJobRequest)
-              .handler(abortRestoreJobHandler);
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.SNAPSHOTS_ROUTE)
+                                    .handler(listSnapshotHandler)
+                                    .build();
 
-        router.get(ApiEndpointsV1.RESTORE_JOB_PROGRESS_ROUTE)
-              .handler(validateTableExistence)
-              .handler(validateRestoreJobRequest)
-              .handler(restoreJobProgressHandler);
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.DELETE)
+                                    .endpoint(ApiEndpointsV1.SNAPSHOTS_ROUTE)
+                                    // Leverage the validateTableExistence. Currently, JMX does not validate for non-existent keyspace.
+                                    // Additionally, the current JMX implementation to clear snapshots does not support passing a table
+                                    // as a parameter.
+                                    .handler(validateTableExistence)
+                                    .handler(clearSnapshotHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.PUT)
+                                    .endpoint(ApiEndpointsV1.SNAPSHOTS_ROUTE)
+                                    .handler(createSnapshotHandler)
+                                    .build();
+
+        //noinspection deprecation
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.DEPRECATED_ALL_KEYSPACES_SCHEMA_ROUTE)
+                                    .handler(schemaHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.ALL_KEYSPACES_SCHEMA_ROUTE)
+                                    .handler(schemaHandler)
+                                    .build();
+
+        //noinspection deprecation
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.DEPRECATED_KEYSPACE_SCHEMA_ROUTE)
+                                    .handler(keyspaceSchemaHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.KEYSPACE_SCHEMA_ROUTE)
+                                    .handler(keyspaceSchemaHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.RING_ROUTE)
+                                    .handler(ringHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.RING_ROUTE_PER_KEYSPACE)
+                                    .handler(keyspaceRingHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.CONNECTED_CLIENT_STATS_ROUTE)
+                                    .handler(connectedClientStatsHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.OPERATIONAL_JOB_ROUTE)
+                                    .handler(operationalJobHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.LIST_OPERATIONAL_JOBS_ROUTE)
+                                    .handler(listOperationalJobsHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.PUT)
+                                    .endpoint(ApiEndpointsV1.NODE_DECOMMISSION_ROUTE)
+                                    .handler(nodeDecommissionHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.PUT)
+                                    .endpoint(ApiEndpointsV1.SSTABLE_UPLOAD_ROUTE)
+                                    .handler(ssTableUploadHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.KEYSPACE_TOKEN_MAPPING_ROUTE)
+                                    .handler(tokenRangeHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.PUT)
+                                    .endpoint(ApiEndpointsV1.SSTABLE_IMPORT_ROUTE)
+                                    .handler(ssTableImportHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.DELETE)
+                                    .endpoint(ApiEndpointsV1.SSTABLE_CLEANUP_ROUTE)
+                                    .handler(ssTableCleanupHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.GOSSIP_INFO_ROUTE)
+                                    .handler(gossipInfoHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.POST)
+                                    .endpoint(ApiEndpointsV1.CREATE_RESTORE_JOB_ROUTE)
+                                    .setBodyHandler(true)
+                                    .handler(validateTableExistence)
+                                    .handler(validateRestoreJobRequest)
+                                    .handler(createRestoreJobHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.POST)
+                                    .endpoint(ApiEndpointsV1.RESTORE_JOB_SLICES_ROUTE)
+                                    .setBodyHandler(true)
+                                    .handler(diskSpaceProtection) // reject creating slice if short of disk space
+                                    .handler(validateTableExistence)
+                                    .handler(validateRestoreJobRequest)
+                                    .handler(createRestoreSliceHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.RESTORE_JOB_ROUTE)
+                                    .handler(validateTableExistence)
+                                    .handler(validateRestoreJobRequest)
+                                    .handler(restoreJobSummaryHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.PATCH)
+                                    .endpoint(ApiEndpointsV1.RESTORE_JOB_ROUTE)
+                                    .setBodyHandler(true)
+                                    .handler(validateTableExistence)
+                                    .handler(validateRestoreJobRequest)
+                                    .handler(updateRestoreJobHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.POST)
+                                    .endpoint(ApiEndpointsV1.ABORT_RESTORE_JOB_ROUTE)
+                                    .setBodyHandler(true)
+                                    .handler(validateTableExistence)
+                                    .handler(validateRestoreJobRequest)
+                                    .handler(abortRestoreJobHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.RESTORE_JOB_PROGRESS_ROUTE)
+                                    .handler(validateTableExistence)
+                                    .handler(validateRestoreJobRequest)
+                                    .handler(restoreJobProgressHandler)
+                                    .build();
 
         // CDC APIs
-        router.get(ApiEndpointsV1.LIST_CDC_SEGMENTS_ROUTE)
-              .handler(listCdcDirHandler);
-        router.get(ApiEndpointsV1.STREAM_CDC_SEGMENTS_ROUTE)
-              .handler(streamCdcSegmentHandler);
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.LIST_CDC_SEGMENTS_ROUTE)
+                                    .handler(listCdcDirHandler)
+                                    .build();
+
+        protectedRouteBuilderFactory.get().router(router).method(HttpMethod.GET)
+                                    .endpoint(ApiEndpointsV1.STREAM_CDC_SEGMENTS_ROUTE)
+                                    .handler(streamCdcSegmentHandler)
+                                    .build();
 
         return router;
     }
@@ -479,7 +604,8 @@ public class MainModule extends AbstractModule
 
     @Provides
     @Singleton
-    public CQLSessionProvider cqlSessionProvider(Vertx vertx, SidecarConfiguration sidecarConfiguration,
+    public CQLSessionProvider cqlSessionProvider(Vertx vertx,
+                                                 SidecarConfiguration sidecarConfiguration,
                                                  DriverUtils driverUtils)
     {
         CQLSessionProviderImpl cqlSessionProvider = new CQLSessionProviderImpl(sidecarConfiguration,
@@ -642,6 +768,7 @@ public class MainModule extends AbstractModule
                                        RestoreJobsSchema restoreJobsSchema,
                                        RestoreSlicesSchema restoreSlicesSchema,
                                        RestoreRangesSchema restoreRangesSchema,
+                                       SidecarRolePermissionsSchema sidecarRolePermissionsSchema,
                                        SystemAuthSchema systemAuthSchema,
                                        SidecarLeaseSchema sidecarLeaseSchema,
                                        SidecarMetrics metrics,
@@ -651,6 +778,7 @@ public class MainModule extends AbstractModule
         sidecarInternalKeyspace.registerTableSchema(restoreJobsSchema);
         sidecarInternalKeyspace.registerTableSchema(restoreSlicesSchema);
         sidecarInternalKeyspace.registerTableSchema(restoreRangesSchema);
+        sidecarInternalKeyspace.registerTableSchema(sidecarRolePermissionsSchema);
         sidecarInternalKeyspace.registerTableSchema(systemAuthSchema);
         sidecarInternalKeyspace.registerTableSchema(sidecarLeaseSchema);
         SchemaMetrics schemaMetrics = metrics.server().schema();

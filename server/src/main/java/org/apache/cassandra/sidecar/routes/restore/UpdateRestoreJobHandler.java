@@ -18,6 +18,9 @@
 
 package org.apache.cassandra.sidecar.routes.restore;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import com.datastax.driver.core.utils.UUIDs;
@@ -29,7 +32,10 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.Json;
 import io.vertx.core.net.SocketAddress;
+import io.vertx.ext.auth.authorization.Authorization;
 import io.vertx.ext.web.RoutingContext;
+import org.apache.cassandra.sidecar.acl.authorization.BasicPermissions;
+import org.apache.cassandra.sidecar.acl.authorization.VariableAwareResource;
 import org.apache.cassandra.sidecar.common.data.RestoreJobStatus;
 import org.apache.cassandra.sidecar.common.request.data.UpdateRestoreJobRequestPayload;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
@@ -38,6 +44,7 @@ import org.apache.cassandra.sidecar.db.RestoreJobDatabaseAccessor;
 import org.apache.cassandra.sidecar.metrics.RestoreMetrics;
 import org.apache.cassandra.sidecar.metrics.SidecarMetrics;
 import org.apache.cassandra.sidecar.routes.AbstractHandler;
+import org.apache.cassandra.sidecar.routes.AccessProtected;
 import org.apache.cassandra.sidecar.routes.RoutingContextUtils;
 import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
@@ -49,7 +56,7 @@ import static org.apache.cassandra.sidecar.utils.HttpExceptions.wrapHttpExceptio
  * Provides a REST API to update {@link RestoreJob}
  */
 @Singleton
-public class UpdateRestoreJobHandler extends AbstractHandler<UpdateRestoreJobRequestPayload>
+public class UpdateRestoreJobHandler extends AbstractHandler<UpdateRestoreJobRequestPayload> implements AccessProtected
 {
     private final RestoreJobDatabaseAccessor restoreJobDatabaseAccessor;
     private final RestoreMetrics metrics;
@@ -64,6 +71,13 @@ public class UpdateRestoreJobHandler extends AbstractHandler<UpdateRestoreJobReq
         super(instanceMetadataFetcher, executorPools, validator);
         this.restoreJobDatabaseAccessor = restoreJobDatabaseAccessor;
         this.metrics = metrics.server().restore();
+    }
+
+    @Override
+    public Set<Authorization> requiredAuthorizations()
+    {
+        List<String> eligibleResources = VariableAwareResource.DATA_WITH_KEYSPACE_TABLE.expandedResources();
+        return Collections.singleton(BasicPermissions.EDIT_RESTORE_JOB.toAuthorization(eligibleResources));
     }
 
     @Override

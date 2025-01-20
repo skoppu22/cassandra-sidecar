@@ -67,10 +67,14 @@ import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.common.server.data.Name;
 import org.apache.cassandra.sidecar.common.server.data.QualifiedTableName;
 import org.apache.cassandra.sidecar.common.server.dns.DnsResolver;
+import org.apache.cassandra.sidecar.config.SslConfiguration;
+import org.apache.cassandra.sidecar.config.yaml.KeyStoreConfigurationImpl;
+import org.apache.cassandra.sidecar.config.yaml.SslConfigurationImpl;
 import org.apache.cassandra.sidecar.server.MainModule;
 import org.apache.cassandra.sidecar.server.Server;
 import org.apache.cassandra.sidecar.server.SidecarServerEvents;
 import org.apache.cassandra.testing.AbstractCassandraTestContext;
+import org.apache.cassandra.testing.AuthMode;
 
 import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_CASSANDRA_CQL_READY;
 import static org.apache.cassandra.sidecar.testing.IntegrationTestModule.ADMIN_IDENTITY;
@@ -97,7 +101,6 @@ public abstract class IntegrationTestBase
     protected File tempDir;
     protected CertificateBundle ca;
     protected Path serverKeystorePath;
-    protected String serverKeystorePassword = "password";
     protected Path clientKeystorePath;
     protected String clientKeystorePassword = "password";
     protected Path truststorePath;
@@ -112,9 +115,9 @@ public abstract class IntegrationTestBase
     {
         testExceptions.clear();
 
-        ca = ca();
-        truststorePath = truststorePath();
-        serverKeystorePath = serverKeystorePath();
+        ca = cassandraTestContext.ca;
+        truststorePath = cassandraTestContext.truststorePath;
+        serverKeystorePath = cassandraTestContext.serverKeystorePath;
         clientKeystorePath = clientKeystorePath(ADMIN_IDENTITY);
 
         IntegrationTestModule integrationTestModule = new IntegrationTestModule();
@@ -125,13 +128,22 @@ public abstract class IntegrationTestBase
         int clusterSize = cassandraTestContext.clusterSize();
         injector = Guice.createInjector(Modules.override(new MainModule()).with(integrationTestModule));
         vertx = injector.getInstance(Vertx.class);
-        sidecarTestContext = CassandraSidecarTestContext.from(vertx, cassandraTestContext, DnsResolver.DEFAULT,
-                                                              getNumInstancesToManage(clusterSize), null);
 
+        SslConfiguration sslConfig = cassandraTestContext.annotation.authMode().equals(AuthMode.MUTUAL_TLS)
+                                     ? sslConfigWithClientKeystoreTruststore() : null;
+
+        // When only SSL is enabled and mTLS is not enabled, we should not set keystore in SslConfig. Set a keystore
+        // when mTLS is enabled
+        if (cassandraTestContext.annotation.enableSsl() &&
+            !cassandraTestContext.annotation.authMode().equals(AuthMode.MUTUAL_TLS))
+        {
+            sslConfig = sslConfigWithTruststore();
+        }
+        sidecarTestContext = CassandraSidecarTestContext.from(vertx, cassandraTestContext, DnsResolver.DEFAULT,
+                                                              getNumInstancesToManage(clusterSize), sslConfig);
         integrationTestModule.setCassandraTestContext(sidecarTestContext);
 
         server = injector.getInstance(Server.class);
-        client = createClient(clientKeystorePath, truststorePath);
         VertxTestContext context = new VertxTestContext();
 
         if (sidecarTestContext.isClusterBuilt())
@@ -431,29 +443,6 @@ public abstract class IntegrationTestBase
                          .forEach(instanceMetadata -> instanceMetadata.delegate().healthCheck());
     }
 
-    protected CertificateBundle ca() throws Exception
-    {
-        return CertificateBuilder.builder()
-                                 .subject("CN=Apache cassandra Root CA, OU=Certification Authority, O=Unknown, C=Unknown")
-                                 .isCertificateAuthority(true)
-                                 .buildSelfSigned();
-    }
-    protected Path truststorePath() throws Exception
-    {
-        return ca.toTempKeyStorePath(tempDir.toPath(), truststorePassword.toCharArray(), truststorePassword.toCharArray());
-    }
-
-    protected Path serverKeystorePath() throws Exception
-    {
-        CertificateBundle keystore
-        = CertificateBuilder.builder()
-                            .subject("CN=Apache Cassandra, OU=ssl_test, O=Unknown, L=Unknown, ST=Unknown, C=Unknown")
-                            .addSanDnsName("localhost")
-                            .addSanIpAddress("127.0.0.1")
-                            .buildIssuedBy(ca);
-        return keystore.toTempKeyStorePath(tempDir.toPath(), serverKeystorePassword.toCharArray(), serverKeystorePassword.toCharArray());
-    }
-
     protected Path clientKeystorePath(String identity) throws Exception
     {
         return clientKeystorePath(identity, false);
@@ -473,6 +462,24 @@ public abstract class IntegrationTestBase
         }
         CertificateBundle clientKeystore = builder.buildIssuedBy(ca);
         return clientKeystore.toTempKeyStorePath(tempDir.toPath(), clientKeystorePassword.toCharArray(), clientKeystorePassword.toCharArray());
+    }
+
+    private SslConfiguration sslConfigWithClientKeystoreTruststore()
+    {
+        return SslConfigurationImpl
+               .builder()
+               .enabled(true)
+               .keystore(new KeyStoreConfigurationImpl(clientKeystorePath.toAbsolutePath().toString(), clientKeystorePassword, "PKCS12"))
+               .truststore(new KeyStoreConfigurationImpl(truststorePath.toAbsolutePath().toString(), truststorePassword, "PKCS12"))
+               .build();
+    }
+
+    private SslConfiguration sslConfigWithTruststore()
+    {
+        return SslConfigurationImpl.builder()
+                                   .enabled(true)
+                                   .truststore(new KeyStoreConfigurationImpl(truststorePath.toAbsolutePath().toString(), truststorePassword, "PKCS12"))
+                                   .build();
     }
 
     protected WebClient createClient(Path clientKeystorePath, Path truststorePath)

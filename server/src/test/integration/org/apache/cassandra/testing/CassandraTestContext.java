@@ -18,6 +18,9 @@
 
 package org.apache.cassandra.testing;
 
+import java.nio.file.Path;
+
+import io.vertx.ext.auth.mtls.utils.CertificateBundle;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 
 /**
@@ -30,9 +33,12 @@ public class CassandraTestContext extends AbstractCassandraTestContext
 
     public CassandraTestContext(SimpleCassandraVersion version,
                                 UpgradeableCluster cluster,
+                                CertificateBundle ca,
+                                Path serverKeystorePath,
+                                Path truststorePath,
                                 CassandraIntegrationTest annotation)
     {
-        super(version, cluster, annotation);
+        super(version, cluster, ca, serverKeystorePath, truststorePath, annotation);
     }
 
     @Override

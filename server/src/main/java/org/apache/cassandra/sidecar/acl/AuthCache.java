@@ -33,6 +33,7 @@ import io.vertx.core.eventbus.EventBus;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.concurrent.TaskExecutorPool;
 import org.apache.cassandra.sidecar.config.CacheConfiguration;
+import org.apache.cassandra.sidecar.exceptions.SchemaUnavailableException;
 import org.jetbrains.annotations.VisibleForTesting;
 
 import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_SIDECAR_SCHEMA_INITIALIZED;
@@ -162,6 +163,10 @@ public abstract class AuthCache<K, V>
         try
         {
             cache.putAll(bulkLoadFunction.get());
+        }
+        catch (SchemaUnavailableException sue)
+        {
+            LOGGER.warn("system_auth schema is unavailable. Skip warming up cache", sue);
         }
         catch (Exception e)
         {

@@ -18,7 +18,6 @@
 
 package org.apache.cassandra.sidecar.routes.cassandra;
 
-
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import io.vertx.core.http.HttpServerRequest;
@@ -29,7 +28,11 @@ import org.apache.cassandra.sidecar.routes.AbstractHandler;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
 
 /**
- * Provides REST endpoint to get the configured settings of a cassandra node
+ * Provides REST endpoint to get the configured settings of a cassandra node.
+ * <p>
+ * Note: {@link NodeSettingsHandler} is not Access protected. Any user who can log in into Cassandra is able to view
+ * node settings information. Since sidecar and cassandra share list of authenticated identities, sidecar's
+ * authenticated users can also read node settings information.
  */
 @Singleton
 public class NodeSettingsHandler extends AbstractHandler<Void>

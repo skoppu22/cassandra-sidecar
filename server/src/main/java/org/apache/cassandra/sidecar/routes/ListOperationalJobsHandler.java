@@ -18,11 +18,16 @@
 
 package org.apache.cassandra.sidecar.routes;
 
+import java.util.Collections;
+import java.util.Set;
 import javax.inject.Inject;
 
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
+import io.vertx.ext.auth.authorization.Authorization;
 import io.vertx.ext.web.RoutingContext;
+import org.apache.cassandra.sidecar.acl.authorization.BasicPermissions;
+import org.apache.cassandra.sidecar.acl.authorization.VariableAwareResource;
 import org.apache.cassandra.sidecar.common.response.ListOperationalJobsResponse;
 import org.apache.cassandra.sidecar.common.response.OperationalJobResponse;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
@@ -35,7 +40,7 @@ import static org.apache.cassandra.sidecar.common.data.OperationalJobStatus.RUNN
 /**
  * Handler for retrieving the all the jobs running on the sidecar
  */
-public class ListOperationalJobsHandler extends AbstractHandler<Void>
+public class ListOperationalJobsHandler extends AbstractHandler<Void> implements AccessProtected
 {
     private final OperationalJobManager jobManager;
 
@@ -47,6 +52,13 @@ public class ListOperationalJobsHandler extends AbstractHandler<Void>
     {
         super(metadataFetcher, executorPools, validator);
         this.jobManager = jobManager;
+    }
+
+    @Override
+    public Set<Authorization> requiredAuthorizations()
+    {
+        String resource = VariableAwareResource.OPERATION.resource();
+        return Collections.singleton(BasicPermissions.READ_OPERATIONAL_JOB.toAuthorization(resource));
     }
 
     @Override

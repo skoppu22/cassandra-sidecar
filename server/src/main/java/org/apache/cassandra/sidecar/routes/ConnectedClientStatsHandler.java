@@ -18,10 +18,18 @@
 
 package org.apache.cassandra.sidecar.routes;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+
 import com.google.inject.Inject;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
+import io.vertx.ext.auth.authorization.Authorization;
 import io.vertx.ext.web.RoutingContext;
+import org.apache.cassandra.sidecar.acl.authorization.CassandraPermissions;
+import org.apache.cassandra.sidecar.acl.authorization.VariableAwareResource;
 import org.apache.cassandra.sidecar.common.server.MetricsOperations;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
@@ -31,7 +39,7 @@ import static org.apache.cassandra.sidecar.utils.RequestUtils.parseBooleanQueryP
 /**
  * Handler for retrieving stats for connected clients
  */
-public class ConnectedClientStatsHandler extends AbstractHandler<Boolean>
+public class ConnectedClientStatsHandler extends AbstractHandler<Boolean> implements AccessProtected
 {
     /**
      * Constructs a handler with the provided {@code metadataFetcher}
@@ -43,6 +51,19 @@ public class ConnectedClientStatsHandler extends AbstractHandler<Boolean>
     protected ConnectedClientStatsHandler(InstanceMetadataFetcher metadataFetcher, ExecutorPools executorPools)
     {
         super(metadataFetcher, executorPools, null);
+    }
+
+    @Override
+    public Set<Authorization> requiredAuthorizations()
+    {
+        List<String> eligibleResources = Arrays.asList(VariableAwareResource.DATA.resource(),
+                                                       // Keyspace access to system_views
+                                                       "data/system_views",
+                                                       // Access to all tables in keyspace system_views
+                                                       "data/system_views/*",
+                                                       // Access to the clients table in the system_views keyspace
+                                                       "data/system_views/clients");
+        return Collections.singleton(CassandraPermissions.SELECT.toAuthorization(eligibleResources));
     }
 
     /**

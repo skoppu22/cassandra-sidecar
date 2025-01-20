@@ -18,12 +18,18 @@
 
 package org.apache.cassandra.sidecar.routes;
 
+import java.util.Collections;
+import java.util.Set;
+
 import com.datastax.driver.core.utils.UUIDs;
 import com.google.inject.Inject;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.net.SocketAddress;
+import io.vertx.ext.auth.authorization.Authorization;
 import io.vertx.ext.web.RoutingContext;
+import org.apache.cassandra.sidecar.acl.authorization.BasicPermissions;
+import org.apache.cassandra.sidecar.acl.authorization.VariableAwareResource;
 import org.apache.cassandra.sidecar.common.data.OperationalJobStatus;
 import org.apache.cassandra.sidecar.common.response.OperationalJobResponse;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
@@ -41,7 +47,7 @@ import static org.apache.cassandra.sidecar.utils.RequestUtils.parseBooleanQueryP
 /**
  * Provides REST API for asynchronously decommissioning the corresponding Cassandra node
  */
-public class NodeDecommissionHandler extends AbstractHandler<Boolean>
+public class NodeDecommissionHandler extends AbstractHandler<Boolean> implements AccessProtected
 {
     private final OperationalJobManager jobManager;
     private final ServiceConfiguration config;
@@ -63,6 +69,13 @@ public class NodeDecommissionHandler extends AbstractHandler<Boolean>
         super(metadataFetcher, executorPools, validator);
         this.jobManager = jobManager;
         this.config = serviceConfiguration;
+    }
+
+    @Override
+    public Set<Authorization> requiredAuthorizations()
+    {
+        String resource = VariableAwareResource.OPERATION.resource();
+        return Collections.singleton(BasicPermissions.DECOMMISSION_NODE.toAuthorization(resource));
     }
 
     /**

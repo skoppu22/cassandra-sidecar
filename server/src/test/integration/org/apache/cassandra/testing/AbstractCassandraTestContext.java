@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.testing;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -25,6 +26,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.vertx.ext.auth.mtls.utils.CertificateBundle;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.shared.ShutdownException;
 
@@ -39,22 +41,36 @@ public abstract class AbstractCassandraTestContext implements AutoCloseable
     private final Map<String, String> initialProperties;
     protected UpgradeableCluster cluster;
 
+    // certificates created when cluster is started with auth
+    public final CertificateBundle ca;
+    public final Path serverKeystorePath;
+    public final Path truststorePath;
+
     public CassandraIntegrationTest annotation;
 
     public AbstractCassandraTestContext(SimpleCassandraVersion version,
                                         UpgradeableCluster cluster,
+                                        CertificateBundle ca,
+                                        Path serverKeystorePath,
+                                        Path truststorePath,
                                         CassandraIntegrationTest annotation)
     {
         this.version = version;
         this.cluster = cluster;
+        this.ca = ca;
+        this.serverKeystorePath = serverKeystorePath;
+        this.truststorePath = truststorePath;
         this.annotation = annotation;
         this.initialProperties = systemStringProperties();
     }
 
     public AbstractCassandraTestContext(SimpleCassandraVersion version,
+                                        CertificateBundle ca,
+                                        Path serverKeystorePath,
+                                        Path truststorePath,
                                         CassandraIntegrationTest annotation)
     {
-        this(version, null, annotation);
+        this(version, null, ca, serverKeystorePath, truststorePath, annotation);
     }
 
     public UpgradeableCluster cluster()

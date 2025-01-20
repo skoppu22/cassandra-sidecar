@@ -18,7 +18,10 @@
 
 package org.apache.cassandra.sidecar.routes.snapshots;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.StringUtils;
@@ -29,12 +32,16 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.SocketAddress;
+import io.vertx.ext.auth.authorization.Authorization;
 import io.vertx.ext.web.RoutingContext;
+import org.apache.cassandra.sidecar.acl.authorization.BasicPermissions;
+import org.apache.cassandra.sidecar.acl.authorization.VariableAwareResource;
 import org.apache.cassandra.sidecar.common.server.StorageOperations;
 import org.apache.cassandra.sidecar.common.server.exceptions.NodeBootstrappingException;
 import org.apache.cassandra.sidecar.common.server.exceptions.SnapshotAlreadyExistsException;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.routes.AbstractHandler;
+import org.apache.cassandra.sidecar.routes.AccessProtected;
 import org.apache.cassandra.sidecar.routes.data.SnapshotRequestParam;
 import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
@@ -45,7 +52,7 @@ import static org.apache.cassandra.sidecar.utils.HttpExceptions.wrapHttpExceptio
  * The <b>PUT</b> verb creates a new snapshot for the given keyspace and table
  */
 @Singleton
-public class CreateSnapshotHandler extends AbstractHandler<SnapshotRequestParam>
+public class CreateSnapshotHandler extends AbstractHandler<SnapshotRequestParam> implements AccessProtected
 {
     private static final String TTL_QUERY_PARAM = "ttl";
 
@@ -55,6 +62,13 @@ public class CreateSnapshotHandler extends AbstractHandler<SnapshotRequestParam>
                                  ExecutorPools executorPools)
     {
         super(metadataFetcher, executorPools, validator);
+    }
+
+    @Override
+    public Set<Authorization> requiredAuthorizations()
+    {
+        List<String> eligibleResources = VariableAwareResource.DATA_WITH_KEYSPACE_TABLE.expandedResources();
+        return Collections.singleton(BasicPermissions.CREATE_SNAPSHOT.toAuthorization(eligibleResources));
     }
 
     /**

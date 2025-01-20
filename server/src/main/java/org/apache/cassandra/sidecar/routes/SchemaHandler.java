@@ -17,29 +17,25 @@
  */
 package org.apache.cassandra.sidecar.routes;
 
-import com.datastax.driver.core.KeyspaceMetadata;
-import com.datastax.driver.core.Metadata;
+import java.util.Collections;
+import java.util.Set;
+
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.vertx.core.Future;
-import io.vertx.core.http.HttpServerRequest;
-import io.vertx.core.net.SocketAddress;
+import io.vertx.ext.auth.authorization.Authorization;
 import io.vertx.ext.web.RoutingContext;
-import org.apache.cassandra.sidecar.common.response.SchemaResponse;
+import org.apache.cassandra.sidecar.acl.authorization.BasicPermissions;
+import org.apache.cassandra.sidecar.acl.authorization.VariableAwareResource;
 import org.apache.cassandra.sidecar.common.server.data.Name;
 import org.apache.cassandra.sidecar.concurrent.ExecutorPools;
 import org.apache.cassandra.sidecar.utils.CassandraInputValidator;
 import org.apache.cassandra.sidecar.utils.InstanceMetadataFetcher;
-import org.apache.cassandra.sidecar.utils.MetadataUtils;
-
-import static org.apache.cassandra.sidecar.utils.HttpExceptions.wrapHttpException;
 
 /**
  * The {@link SchemaHandler} class handles schema requests
  */
 @Singleton
-public class SchemaHandler extends AbstractHandler<Name>
+public class SchemaHandler extends KeyspaceSchemaHandler
 {
     /**
      * Constructs a handler with the provided {@code metadataFetcher}
@@ -49,83 +45,27 @@ public class SchemaHandler extends AbstractHandler<Name>
      * @param validator       a validator instance to validate Cassandra-specific input
      */
     @Inject
-    protected SchemaHandler(InstanceMetadataFetcher metadataFetcher, ExecutorPools executorPools,
+    protected SchemaHandler(InstanceMetadataFetcher metadataFetcher,
+                            ExecutorPools executorPools,
                             CassandraInputValidator validator)
     {
         super(metadataFetcher, executorPools, validator);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public void handleInternal(RoutingContext context,
-                               HttpServerRequest httpRequest,
-                               String host,
-                               SocketAddress remoteAddress,
-                               Name keyspace)
+    public Set<Authorization> requiredAuthorizations()
     {
-        metadata(host)
-        .onFailure(cause -> processFailure(cause, context, host, remoteAddress, keyspace))
-        .onSuccess(metadata -> handleWithMetadata(context, keyspace, metadata));
+        String resource = VariableAwareResource.CLUSTER.resource();
+        return Collections.singleton(BasicPermissions.READ_SCHEMA.toAuthorization(resource));
     }
 
     /**
-     * Handles the request with the Cassandra {@link Metadata metadata}.
-     *
-     * @param context  the event to handle
-     * @param keyspace the keyspace parsed from the request
-     * @param metadata the metadata on the connected cluster, including known nodes and schema definitions
-     */
-    private void handleWithMetadata(RoutingContext context, Name keyspace, Metadata metadata)
-    {
-        if (keyspace == null)
-        {
-            SchemaResponse schemaResponse = new SchemaResponse(metadata.exportSchemaAsString());
-            context.json(schemaResponse);
-            return;
-        }
-
-        // retrieve keyspace metadata
-        KeyspaceMetadata ksMetadata = MetadataUtils.keyspace(metadata, keyspace);
-
-        if (ksMetadata == null)
-        {
-            // set request as failed and return
-            // keyspace does not exist
-            String errorMessage = String.format("Keyspace '%s' does not exist.", keyspace);
-            context.fail(wrapHttpException(HttpResponseStatus.NOT_FOUND, errorMessage));
-            return;
-        }
-
-        SchemaResponse schemaResponse = new SchemaResponse(keyspace.name(),
-                                                           ksMetadata.exportAsString());
-        context.json(schemaResponse);
-    }
-
-    /**
-     * Gets cluster metadata asynchronously.
-     *
-     * @param host the Cassandra instance host
-     * @return {@link Future} containing {@link Metadata}
-     */
-    private Future<Metadata> metadata(String host)
-    {
-        return executorPools.service().executeBlocking(() -> {
-            // metadata can block so we need to run in a blocking thread
-            return metadataFetcher.delegate(host).metadata();
-        });
-    }
-
-    /**
-     * Parses the request parameters
-     *
-     * @param context the event to handle
-     * @return the keyspace parsed from the request
+     * @param context the request context
+     * @return {@code null} to signify no keyspace for the request
      */
     @Override
     protected Name extractParamsOrThrow(RoutingContext context)
     {
-        return keyspace(context, false);
+        return null;
     }
 }
