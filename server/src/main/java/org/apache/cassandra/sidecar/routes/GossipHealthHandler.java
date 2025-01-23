@@ -58,9 +58,9 @@ public class GossipHealthHandler extends AbstractHandler<Void>
     {
         StorageOperations operations = metadataFetcher.delegate(host).storageOperations();
         executorPools.service()
-                         .executeBlocking(operations::isGossipRunning)
-                         .onSuccess(isGossipRunning -> context.json(isGossipRunning ? OK_STATUS : NOT_OK_STATUS))
-                         .onFailure(cause -> processFailure(cause, context, host, remoteAddress, request));
+                     .executeBlocking(operations::isGossipRunning)
+                     .onSuccess(isGossipRunning -> context.json(isGossipRunning ? OK_STATUS : NOT_OK_STATUS))
+                     .onFailure(cause -> processFailure(cause, context, host, remoteAddress, request));
     }
 
     /**
